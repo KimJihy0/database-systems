@@ -1,11 +1,16 @@
 #include "file.h"
 
-int fd;
-page_t* header;
-
 // Open existing database file or create one if not existed
 int64_t file_open_database_file(char* path) {
-	fd = open(path, O_SYNC);
+	fd = open(path, O_RDWR|O_SYNC|O_CREAT|O_EXCL);
+	if ((fd == -1) && (errno == EEXIST)) {
+		fd = open(path, O_RDWR|O_SYNC);
+		return fd;
+	}
+	else if (fd == -1) {
+		perror("File open failed\n");
+		exit(1);
+	}
 	return fd;
 }
 
@@ -15,25 +20,6 @@ pagenum_t file_alloc_page() {
 	
 	pagenum_t num;
 
-	/*
-	if (header->free_num == 0) {
-		free_page tmp;
-		tmp.next_page = 0;
-		
-		num = header->page_num;
-		
-		fseek(file, num * page_size, SEEK_SET);
-		fwrite(&tmp, page_size, 1, file);
-		sync();
-		// fflush(file); //
-
-		// header->free_num = num;
-		(header->page_num)++;
-
-		file_write_page(0, header);
-		return num;
-	}
-	*/
 	if (header->free_num == 0) {
 		free_page* tmp;
 
@@ -41,6 +27,7 @@ pagenum_t file_alloc_page() {
 
 		tmp = (free_page*)malloc(sizeof(free_page) * num);
 		pagenum_t pnum = num;
+		//overflow 처리
 		tmp[0].next_page = 0;
 		int i;
 		for (i = 1; i < num; i++) {
@@ -48,11 +35,7 @@ pagenum_t file_alloc_page() {
 		}
 
 		lseek(fd, num * page_size, SEEK_SET);
-		// fwrite(tmp, num * page_size, 1, file);
-		// fwrite(tmp, page_size, num, fdopen(fd, "w"));
 		write(fd, tmp, num * page_size);
-		// sync();
-		// fflush(file);
 
 		// header->free_num = pnum;
 		header->page_num *= 2;
@@ -66,7 +49,6 @@ pagenum_t file_alloc_page() {
 		num = header->free_num;
 
 		lseek(fd, num * page_size, SEEK_SET);
-		// fread(&tmp, page_size, 1, fd);
 		read(fd, &tmp, page_size);
 		
 		header->free_num = tmp.next_page;
@@ -85,10 +67,7 @@ void file_free_page(pagenum_t pagenum) {
 	header->free_num = pagenum;
 	
 	lseek(fd, pagenum * page_size, SEEK_SET);
-	// fwrite(&tmp, page_size, 1, file);
 	write(fd, &tmp, page_size);
-	// sync();
-	// fflush(file);
 
 	file_write_page(0, header);
 }
@@ -99,7 +78,7 @@ void file_read_page(pagenum_t pagenum, page_t* dest) {
 	if (pagenum == 0) {
 		head_page tmp;
 
-		// fread(&tmp, page_size, 1, file);
+		lseek(fd, 0, SEEK_SET); // ?
 		read(fd, &tmp, page_size);
 
 		dest->this_num = 0;
@@ -110,17 +89,14 @@ void file_read_page(pagenum_t pagenum, page_t* dest) {
 
 // Write an in-memory page(src) to the on-disk page
 void file_write_page(pagenum_t pagenum, const page_t* src) {
-	lseek(fd, pagenum * page_size, SEEK_SET);
 	if (pagenum == 0) {
 		head_page tmp;
 		
 		tmp.free_num = src->free_num;
 		tmp.page_num = src->page_num;
-		
-		//fwrite(&tmp, page_size, 1, file);
+
+		lseek(fd, pagenum * page_size, SEEK_SET); // ?
 		write(fd, &tmp, page_size);
-		// sync();
-		// fflush(file);
 	}
 }
 
