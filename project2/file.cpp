@@ -48,41 +48,37 @@ pagenum_t file_alloc_page() {
 	pagenum_t num;
 
 	if (header->free_num == 0) {
-		pagenum_t pnum, wnum;
 		num = header->page_num;
-		pnum = num * 2;
-		if (pnum > UINT64_MAX) {
-			pnum = UINT64_MAX;
-		}
-		wnum = pnum - num;
-		if (wnum == 0) {
+		if (num == UINT64_MAX) {
 			perror("Allocation failed.");
 			exit(1);
 		}
 
-		free_page* tmp;
-		tmp = (free_page*)malloc(sizeof(free_page) * wnum);
-		int i, idx;
-		for (i = num, idx = 0; i < pnum; i++, idx++) {
-			tmp[idx].next_page = i - 1;
-		}
-		tmp[0].next_page = 0;
+		free_page tmppage;
+		pagenum_t tmpnum;
 
-		lseek(fd, num * page_size, SEEK_SET);
-		if (write(fd, tmp, wnum * page_size) < wnum * page_size) {
+		tmppage.next_page = 0;
+		tmpnum = num;
+		lseek(fd, tmpnum * page_size, SEEK_SET);
+		if (write(fd, &tmppage, page_size) < page_size) {
 			perror("Write failed.");
 			exit(1);
 		}
+		for(tmpnum = num + 1; tmpnum < 2 * num && tmpnum < UINT64_MAX; tmpnum++) {
+			tmppage.next_page = tmpnum - 1;
+			if (write(fd, &tmppage, page_size) < page_size) {
+				perror("Write failed.");
+				exit(1);
+			}
+		}
 
-		header->free_num = pnum - 1;
-		header->page_num = pnum;
-
+		header->free_num = tmpnum - 1;
+		header->page_num = tmpnum;
 		file_write_page(0, header);
-		return pnum - 1;
+		return tmpnum - 1;
 	}
 	else {
 		num = header->free_num;
-		
 		free_page tmp;
 
 		lseek(fd, num * page_size, SEEK_SET);
