@@ -15,8 +15,9 @@ int64_t file_open_database_file(char* path) {
 	const pagenum_t page_num = 10 * 0x100000 / page_size;
 
 	free_page* tmp;
-	tmp = (free_page*)malloc(sizeof(free_page) * 2560);
-	for (int i = 1; i < page_num; i++) {
+	tmp = (free_page*)malloc(sizeof(free_page) * page_num);
+	int i;
+	for (i = 1; i < page_num; i++) {
 		tmp[i].next_page = i - 1;
 	}
 	
@@ -26,12 +27,12 @@ int64_t file_open_database_file(char* path) {
 		exit(1);
 	}
 
-	head_page head;
-	head.free_num = page_num - 1;
-	head.page_num = page_num;
+	head_page header;
+	header.free_num = page_num - 1;
+	header.page_num = page_num;
 
 	lseek(fd, 0, SEEK_SET);
-	if (write(fd, &head, page_size) < page_size) {
+	if (write(fd, &header, page_size) < page_size) {
 		perror("Write failed.");
 		exit(1);
 	}
@@ -41,40 +42,48 @@ int64_t file_open_database_file(char* path) {
 
 // Allocate an on-disk page from the free page list
 pagenum_t file_alloc_page() {
+	page_t* header;
 	file_read_page(0, header);
 	
 	pagenum_t num;
 
 	if (header->free_num == 0) {
-		free_page* tmp;
-
+		pagenum_t pnum, wnum;
 		num = header->page_num;
-
-		tmp = (free_page*)malloc(sizeof(free_page) * num);
-		pagenum_t pnum;
-		pnum = num;
-		tmp[0].next_page = 0;
-		int i;
-		for (i = 1; i < num; i++) {
-			tmp[i].next_page = pnum++;
+		pnum = num * 2;
+		if (pnum > UINT64_MAX) {
+			pnum = UINT64_MAX;
+		}
+		wnum = pnum - num;
+		if (wnum == 0) {
+			perror("Allocation failed.");
+			exit(1);
 		}
 
+		free_page* tmp;
+		tmp = (free_page*)malloc(sizeof(free_page) * wnum);
+		int i, idx;
+		for (i = num, idx = 0; i < pnum; i++, idx++) {
+			tmp[idx].next_page = i - 1;
+		}
+		tmp[0].next_page = 0;
+
 		lseek(fd, num * page_size, SEEK_SET);
-		if (write(fd, tmp, num * page_size) < num * page_size) {
+		if (write(fd, tmp, wnum * page_size) < wnum * page_size) {
 			perror("Write failed.");
 			exit(1);
 		}
 
-		header->free_num = pnum;
-		header->page_num *= 2;
+		header->free_num = pnum - 1;
+		header->page_num = pnum;
 
 		file_write_page(0, header);
-		return pnum;
+		return pnum - 1;
 	}
 	else {
-		free_page tmp;
-		
 		num = header->free_num;
+		
+		free_page tmp;
 
 		lseek(fd, num * page_size, SEEK_SET);
 		if (read(fd, &tmp, page_size) < page_size) {
@@ -91,6 +100,7 @@ pagenum_t file_alloc_page() {
 
 // Free an on-disk page to the free page list
 void file_free_page(pagenum_t pagenum) {
+	page_t* header;
 	file_read_page(0, header);
 
 	free_page tmp;

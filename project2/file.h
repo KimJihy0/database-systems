@@ -12,7 +12,6 @@
 typedef uint64_t pagenum_t;
 
 int fd;
-page_t* header;
 
 struct page_t {
 	union {
