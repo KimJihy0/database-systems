@@ -3,14 +3,39 @@
 // Open existing database file or create one if not existed
 int64_t file_open_database_file(char* path) {
 	fd = open(path, O_RDWR|O_SYNC|O_CREAT|O_EXCL);
-	if ((fd == -1) && (errno == EEXIST)) {
+	if ((fd < 0) && (errno == EEXIST)) {
 		fd = open(path, O_RDWR|O_SYNC);
 		return fd;
 	}
-	else if (fd == -1) {
-		perror("File open failed\n");
+	else if (fd < 0) {
+		perror("File open failed.");
 		exit(1);
 	}
+
+	const pagenum_t page_num = 10 * 0x100000 / page_size;
+
+	free_page* tmp;
+	tmp = (free_page*)malloc(sizeof(free_page) * 2560);
+	for (int i = 1; i < page_num; i++) {
+		tmp[i].next_page = i - 1;
+	}
+	
+	lseek(fd, 0, SEEK_SET);
+	if (write(fd, tmp, page_size * page_num) < page_size * page_num) {
+		perror("Write failed.");
+		exit(1);
+	}
+
+	head_page head;
+	head.free_num = page_num - 1;
+	head.page_num = page_num;
+
+	lseek(fd, 0, SEEK_SET);
+	if (write(fd, &head, page_size) < page_size) {
+		perror("Write failed.");
+		exit(1);
+	}
+	
 	return fd;
 }
 
@@ -26,8 +51,8 @@ pagenum_t file_alloc_page() {
 		num = header->page_num;
 
 		tmp = (free_page*)malloc(sizeof(free_page) * num);
-		pagenum_t pnum = num;
-		//overflow 처리
+		pagenum_t pnum;
+		pnum = num;
 		tmp[0].next_page = 0;
 		int i;
 		for (i = 1; i < num; i++) {
@@ -35,9 +60,12 @@ pagenum_t file_alloc_page() {
 		}
 
 		lseek(fd, num * page_size, SEEK_SET);
-		write(fd, tmp, num * page_size);
+		if (write(fd, tmp, num * page_size) < num * page_size) {
+			perror("Write failed.");
+			exit(1);
+		}
 
-		// header->free_num = pnum;
+		header->free_num = pnum;
 		header->page_num *= 2;
 
 		file_write_page(0, header);
@@ -49,7 +77,10 @@ pagenum_t file_alloc_page() {
 		num = header->free_num;
 
 		lseek(fd, num * page_size, SEEK_SET);
-		read(fd, &tmp, page_size);
+		if (read(fd, &tmp, page_size) < page_size) {
+			perror("Read failed.");
+			exit(1);
+		}
 		
 		header->free_num = tmp.next_page;
 
@@ -67,7 +98,10 @@ void file_free_page(pagenum_t pagenum) {
 	header->free_num = pagenum;
 	
 	lseek(fd, pagenum * page_size, SEEK_SET);
-	write(fd, &tmp, page_size);
+	if (write(fd, &tmp, page_size) < page_size) {
+		perror("Write failed.");
+		exit(1);
+	}
 
 	file_write_page(0, header);
 }
@@ -78,10 +112,12 @@ void file_read_page(pagenum_t pagenum, page_t* dest) {
 	if (pagenum == 0) {
 		head_page tmp;
 
-		lseek(fd, 0, SEEK_SET); // ?
-		read(fd, &tmp, page_size);
+		lseek(fd, 0, SEEK_SET);
+		if (read(fd, &tmp, page_size) < page_size) {
+			perror("Read failed.");
+			exit(1);
+		}
 
-		dest->this_num = 0;
 		dest->free_num = tmp.free_num;
 		dest->page_num = tmp.page_num;
 	}
@@ -95,12 +131,18 @@ void file_write_page(pagenum_t pagenum, const page_t* src) {
 		tmp.free_num = src->free_num;
 		tmp.page_num = src->page_num;
 
-		lseek(fd, pagenum * page_size, SEEK_SET); // ?
-		write(fd, &tmp, page_size);
+		lseek(fd, pagenum * page_size, SEEK_SET);
+		if (write(fd, &tmp, page_size) < page_size) {
+			perror("Write failed.");
+			exit(1);
+		}
 	}
 }
 
 // Stop referencing the database file
 void file_close_database_file() {
-	close(fd);
+	if (close(fd) < 0) {
+		perror("Close failed.");
+		exit(1);
+	}
 }

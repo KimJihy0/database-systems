@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #define page_size 4096
 
@@ -14,15 +15,14 @@ int fd;
 page_t* header;
 
 struct page_t {
-	// in-memory page structure
-	uint64_t this_num;
-	// header
-	uint64_t free_num;
-	uint64_t page_num;
-	// free page
-	uint64_t next_page;
-	// alocated page
-	char Reserved[4064];
+	union {
+		uint64_t free_num;
+		uint64_t next_page;
+	};
+	union {
+		uint64_t page_num;
+	};
+	char Reserved[4088];
 };
 
 struct head_page {
