@@ -15,25 +15,21 @@ int fd;
 typedef uint64_t pagenum_t;
 
 struct page_t {
-	union {
-		uint64_t free_num;
-		uint64_t next_page;
-	};
-	union {
-		uint64_t page_num;
-	};
-	char Reserved[4088];
+	uint64_t free_num;
+	uint64_t page_num;
+	uint64_t next_page;
+	char Reserved[4072];
 };
 
 struct head_page {
-	uint64_t free_num;	// 0-7
-	uint64_t page_num;	// 8-15
-	char Reserved[4088];
+	uint64_t free_num;
+	uint64_t page_num;
+	char Reserved[4080];
 };
 
 struct free_page {
-	uint64_t next_page;	// 0-7
-	char Reserved[4092];
+	uint64_t next_page;
+	char Reserved[4088];
 };
 
 struct aloc_page {
