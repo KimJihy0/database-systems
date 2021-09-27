@@ -186,29 +186,3 @@ void file_close_database_file() {
 		exit(1);
 	}
 }
-
-int main() {
-	int mainfd;
-	mainfd = file_open_database_file("db");
-	page_t* header;
-	header = (page_t*)malloc(sizeof(page_t));
-	file_read_page(mainfd, 0, header);
-
-	page_t* footer;
-	footer = (page_t*)malloc(sizeof(page_t));
-	file_read_page(mainfd, 19, footer);
-
-	printf("nextfreepg: %ld\n", footer->next_page);
-
-
-	// file_alloc_page(fd);
-	//file_free_page(fd, 19);
-
-	file_read_page(mainfd, 0, header);
-	printf("pagenum: %ld\n", header->page_num);
-	printf("freenum: %ld\n", header->free_num);
-
-	file_close_database_file();
-
-	return 0;
-}
