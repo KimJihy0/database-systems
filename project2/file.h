@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #define page_size 4096
+#define default_pagenum (10 * 0x100000 / page_size)
 
 int fd;
 
