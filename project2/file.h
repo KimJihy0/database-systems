@@ -7,33 +7,42 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define page_size 4096
-#define default_pagenum (10 * 0x100000 / page_size)
+#define page_size 0x1000 								// 4KiB
+#define default_filesize (10 * 0x100000) 				// 10MiB
+#define default_pagenum (default_filesize / page_size) 	// 2560
 
-int fd;
+//int fd;
+
+dbfile* fds;
 
 typedef uint64_t pagenum_t;
 
 struct page_t {
 	uint64_t free_num;
 	uint64_t page_num;
-	uint64_t next_page;
-	char Reserved[4072];
+	uint64_t next_frpg;
+	char data[4072];
 };
 
 struct head_page {
 	uint64_t free_num;
 	uint64_t page_num;
-	char Reserved[4080];
+	char data[4080];
 };
 
 struct free_page {
-	uint64_t next_page;
-	char Reserved[4088];
+	uint64_t next_frpg;
+	char data[4088];
 };
 
 struct aloc_page {
 	//implement alocated page
+};
+
+struct dbfile {
+	// char path[256];
+	int fd;
+	dbfile* next;
 };
 
 // Open existing database file or create one if not existed.
