@@ -34,8 +34,8 @@ int file_open_database_file(const char* path) {
 		}
 	}
 
-	dbfile* new_file;
-	new_file = (dbfile*)malloc(sizeof(dbfile));
+	file* new_file;
+	new_file = (file*)malloc(sizeof(file));
 	new_file->fd = fd;
 	new_file->next = fds;
 	fds = new_file;
@@ -189,7 +189,7 @@ void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
 
 // Stop referencing the database file
 void file_close_database_file() {
-	dbfile* tfile;
+	file* tfile;
 	for (tfile = fds; tfile; tfile = tfile->next) {
 		close(tfile->fd);
 	}

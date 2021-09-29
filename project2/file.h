@@ -11,7 +11,7 @@
 #define default_filesize (10 * 0x100000) 				// 10MiB
 #define default_pagenum (default_filesize / page_size) 	// 2560
 
-dbfile* fds;
+file* fds;
 
 typedef uint64_t pagenum_t;
 
@@ -37,9 +37,9 @@ struct aloc_page {
 	char data[4096];
 };
 
-struct dbfile {
+struct file {
 	int fd;
-	dbfile* next;
+	file* next;
 };
 
 // Open existing database file or create one if not existed.
