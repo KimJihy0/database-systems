@@ -1,43 +1,6 @@
 #include "file.h"
 
 // Open existing database file or create one if not existed
-#if 0
-int file_open_database_file(const char* path) {
-	fd = open(path, O_RDWR|O_SYNC|O_CREAT|O_EXCL, 0644);
-	if (fd < 0) {
-		if (errno == EEXIST) {
-			fd = open(path, O_RDWR|O_SYNC, 0644);
-		}
-		if (fd < 0) {
-			perror("open error");
-			exit(1);
-		}
-		return fd;
-	}
-
-	head_page header;
-	header.free_num = default_pagenum - 1;
-	header.page_num = default_pagenum;
-	lseek(fd, 0, SEEK_SET);
-	if (write(fd, &header, page_size) < page_size) {
-		perror("write error");
-		exit(1);
-	}
-
-	free_page tmp;
-	int i;
-	for (i = 1; i < default_pagenum; i++) {
-		tmp.next_frpg = i - 1;
-		if (write(fd, &tmp, page_size) < page_size) {
-			perror("write error");
-			exit(1);
-		}
-	}
-
-	return fd;
-}
-#endif
-
 int file_open_database_file(const char* path) {
 	int fd;
 	fd = open(path, O_RDWR|O_SYNC|O_CREAT|O_EXCL, 0644);
@@ -226,11 +189,6 @@ void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
 
 // Stop referencing the database file
 void file_close_database_file() {
-	// int curfd;
-	// for (curfd = fd; curfd > 2; curfd--) {
-	// 	close(curfd);
-	// }
-
 	dbfile* tfile;
 	for (tfile = fds; tfile; tfile = tfile->next) {
 		close(tfile->fd);
