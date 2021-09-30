@@ -6,12 +6,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <string.h>
 
-#define page_size 0x1000 								// 4KiB
-#define default_filesize (10 * 0x100000) 				// 10MiB
-#define default_pagenum (default_filesize / page_size) 	// 2560
-
-file* fds;
+#define PAGE_SIZE 0x1000 								// 4KiB
+#define INITIAL_FILESIZE (10 * 0x100000) 				// 10MiB
+#define INITIAL_PAGENUM (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
 
 typedef uint64_t pagenum_t;
 
@@ -19,7 +18,7 @@ struct page_t {
 	uint64_t free_num;
 	uint64_t page_num;
 	uint64_t next_frpg;
-	char data[4072];
+	char data[4096];
 };
 
 struct head_page {
