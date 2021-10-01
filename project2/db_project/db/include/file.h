@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DB_FILE_H_
+#define DB_FILE_H_
 
 #include <stdio.h>
 #include <stdint.h>
@@ -54,3 +55,5 @@ void file_write_page(int fd, pagenum_t pagenum, const page_t* src);
 
 // Close the database file
 void file_close_database_file();
+
+#endif	// DB_FILE_H_
