@@ -1,4 +1,4 @@
-#include "file.h"
+#include "../include/file.h"
 
 file* files;
 
@@ -20,9 +20,9 @@ int file_open_database_file(const char* path) {
 	}
 	// file not exists
 	else {
-		head_page header;
+		page_t header;
 		header.free_num = INITIAL_PAGENUM - 1;
-		header.page_num = INITIAL_PAGENUM;
+		header.num_pages = INITIAL_PAGENUM;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 			perror("Failure to write");
@@ -30,7 +30,7 @@ int file_open_database_file(const char* path) {
 		}
 		sync();
 
-		free_page tmp;
+		page_t tmp;
 		int i;
 		for (i = 1; i < INITIAL_PAGENUM; i++) {
 			tmp.next_frpg = i - 1;
@@ -58,7 +58,7 @@ int file_open_database_file(const char* path) {
 
 // Allocate an on-disk page from the free page list
 pagenum_t file_alloc_page(int fd) {
-	head_page header;
+	page_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
@@ -68,13 +68,13 @@ pagenum_t file_alloc_page(int fd) {
 	pagenum_t num;
 	// free page not exists
 	if (header.free_num == 0) {
-		num = header.page_num;
+		num = header.num_pages;
 		if (num == UINT64_MAX) {
 			perror("Failure to allocate page(Too many allocated pages)");
 			exit(1);
 		}
 
-		free_page tmppage;
+		page_t tmppage;
 		tmppage.next_frpg = 0;
 		lseek(fd, num * PAGE_SIZE, SEEK_SET);
 		if (write(fd, &tmppage, PAGE_SIZE) < PAGE_SIZE) {
@@ -94,7 +94,7 @@ pagenum_t file_alloc_page(int fd) {
 		}
 
 		header.free_num = tmpnum - 1;
-		header.page_num = tmpnum;
+		header.num_pages = tmpnum;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 			perror("Failure to write");
@@ -105,7 +105,7 @@ pagenum_t file_alloc_page(int fd) {
 	// allocate page
 	num = header.free_num;
 
-	free_page tmp;
+	page_t tmp;
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
 	if (read(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
@@ -125,14 +125,14 @@ pagenum_t file_alloc_page(int fd) {
 
 // Free an on-disk page to the free page list
 void file_free_page(int fd, pagenum_t pagenum) {
-	head_page header;
+	page_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
 		exit(1);
 	}
 
-	free_page tmp;
+	page_t tmp;
 	tmp.next_frpg = header.free_num;
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {

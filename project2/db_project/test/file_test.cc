@@ -79,7 +79,7 @@ TEST_F(FileTest, HandlesPageAllocation) {
 
     // Traverse the free page list and check the existence of the freed/allocated
     // pages. You might need to open a few APIs soley for testing.
-    head_page header;
+    page_t header;
     lseek(fd, 0, SEEK_SET);
     read(fd, &header, PAGE_SIZE);
     EXPECT_EQ(header.free_num, 2558);
