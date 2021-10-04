@@ -13,6 +13,11 @@ typedef uint64_t pagenum_t;
 
 int64_t open_table(char* pathname);
 
+// void print_header(page_t header);
+// void print_page(pagenum_t page_num, page_t page);
+// void print_pgnum(int64_t table_id, pagenum_t page_num);
+// void print_all(int64_t table_id);
+// void print_leaves(int64_t table_id);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
 
 pagenum_t make_page(int64_t table_id);

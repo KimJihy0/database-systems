@@ -15,34 +15,34 @@ struct slot_t {
 
 struct entry_t {
     uint64_t key;
-    uint64_t page_num;
+    uint64_t child;
 };
 
 struct page_t {
-    union { // 000~008
+    union {
         uint64_t free_num;
         uint64_t parent;
         uint64_t next_frpg;
     };
-    union { // 008~016
+    union {
         uint64_t num_pages;
         struct {
             uint32_t is_leaf;
             uint32_t num_keys;
         };
     };
-    union { // 016~024
+    union {
         uint64_t root_num;
     };
     char reserved[88];
-    union { // 112~120
+    union {
         uint64_t free_space;
     };
-    union { // 120~128
+    union { 
         uint64_t sibling;
-        uint64_t this_num;
+        uint64_t left_child;
     };
-    union {
+    union { 
         union {
             slot_t slots[64];
             char values[3968];
