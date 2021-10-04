@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+#define HEADER_SIZE 128
+#define FREE_SPACE 3968
+#define SLOT_SIZE 12
+#define VALUE_SIZE 112
+#define ENTRY_ORDER 249
+
 typedef uint64_t pagenum_t;
 
 int64_t open_table(char* pathname);

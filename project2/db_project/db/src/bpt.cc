@@ -11,7 +11,7 @@ void print_page(page_t page) {
 		printf("sibling: %ld\n", page.sibling);
 
 		for (int i = 0; i < page.num_keys; i++) {
-			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.values + page.slots[i].offset - 128);
+			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.values + page.slots[i].offset - HEADER_SIZE);
 		}
 	}
 	else {
@@ -26,6 +26,40 @@ void print_page(page_t page) {
 		}
 	}
 }
+
+void print_leaves(int64_t table_id) {
+    int i;
+    pagenum_t temp_pgnum;
+    page_t header, temp;
+
+    file_read_page(table_id, 0, &header);
+
+    temp_pgnum = header.root_num;
+
+    file_read_page(table_id, temp_pgnum, &temp);
+
+    if (temp_pgnum == 0) {
+        printf("Empty tree.\n");
+        return;
+    }
+    while (!temp.is_leaf) {
+        temp_pgnum = temp.this_num;
+        file_read_page(table_id, temp_pgnum, &temp);
+    }
+    while (true) {
+        for (i = 0; i < temp.num_keys; i++) {
+            printf("%ld:%s ", temp.slots[i].key, temp.values + temp.slots[i].offset - 128);
+        }
+        if (temp.sibling != 0) {
+            printf("\n\n");
+            temp_pgnum = temp.sibling;
+            file_read_page(table_id, temp_pgnum, &temp);
+        }
+        else break;
+    }
+    printf("\n");
+}
+
 
 int64_t open_table(char* pathname) {
     int64_t table_id = file_open_database_file(pathname);
@@ -127,7 +161,7 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
     }
     leaf.slots[insertion_point].key = key;
     leaf.slots[insertion_point].size = val_size;
-    leaf.slots[insertion_point].offset = offset - val_size + 128;
+    leaf.slots[insertion_point].offset = offset - val_size + HEADER_SIZE;
     memmove(leaf.values + offset - val_size, value, val_size);
     leaf.num_keys++;
     leaf.free_space -= (SLOT_SIZE + val_size);
@@ -145,9 +179,9 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         char values[4092];
     } temp;
     int insertion_index, split, new_key, i, j;
-    uint16_t offset;
+    uint16_t offset, new_offset;
     uint64_t total_size;
-    int num_keys;
+    int num_keys, gap;
     
     new_leaf_pgnum = make_leaf(table_id);
 
@@ -161,14 +195,14 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
 
     total_size = 0;
     split = 0;
+    gap = SLOT_SIZE  + VALUE_SIZE;
     offset = FREE_SPACE;
-    int gap = 124;
     for (i = 0, j = 0; i < leaf.num_keys; i++, j++) {
         if (j == insertion_index) {
             gap -= val_size;
             temp.slots[j].key = key;
             temp.slots[j].size = val_size;
-            temp.slots[j].offset = offset + gap + 128;
+            temp.slots[j].offset = offset + gap + HEADER_SIZE;
             memmove(temp.values + offset + gap, value, val_size);
 
             total_size += (SLOT_SIZE + val_size);
@@ -181,7 +215,7 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         offset -= leaf.slots[i].size;
         temp.slots[j].key = leaf.slots[i].key;
         temp.slots[j].size = leaf.slots[i].size;
-        temp.slots[j].offset = offset + gap + 128;
+        temp.slots[j].offset = offset + gap + HEADER_SIZE;
         memmove(temp.values + offset + gap,
                 leaf.values + offset, leaf.slots[i].size);
 
@@ -200,23 +234,22 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         offset -= temp.slots[i].size;
         leaf.slots[i].key = temp.slots[i].key;
         leaf.slots[i].size = temp.slots[i].size;
-        leaf.slots[i].offset = offset + 128;
+        leaf.slots[i].offset = offset + HEADER_SIZE;
         memmove(leaf.values + offset,
-                temp.values + offset + 124, temp.slots[i].size);
+                temp.values + offset + SLOT_SIZE + VALUE_SIZE, temp.slots[i].size);
         leaf.num_keys++;
         leaf.free_space -= (SLOT_SIZE + temp.slots[i].size);
     }
 
-    int16_t new_offset;
     new_offset = FREE_SPACE;
     for (i = split, j = 0; i <= num_keys; i++, j++) {
         new_offset -= temp.slots[i].size;
         offset -= temp.slots[i].size;
         new_leaf.slots[j].key = temp.slots[i].key;
         new_leaf.slots[j].size = temp.slots[i].size;
-        new_leaf.slots[j].offset = new_offset + 128;
+        new_leaf.slots[j].offset = new_offset + HEADER_SIZE;
         memmove(new_leaf.values + new_offset,
-                temp.values + offset + 124, temp.slots[i].size);
+                temp.values + offset + SLOT_SIZE + VALUE_SIZE, temp.slots[i].size);
         new_leaf.num_keys++;
         new_leaf.free_space -= (SLOT_SIZE + temp.slots[i].size);
     }
@@ -226,9 +259,6 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
 
     new_leaf.parent = leaf.parent;
     new_key = new_leaf.slots[0].key;
-
-    // print_page(leaf);
-    // print_page(new_leaf);
 
     file_write_page(table_id, leaf_pgnum, &leaf);
     file_write_page(table_id, new_leaf_pgnum, &new_leaf);
@@ -261,7 +291,7 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
     pagenum_t new_pgnum;
     page_t parent, right, new_page, child;
     pagenum_t this_num;
-    entry_t temp[249];
+    entry_t temp[ENTRY_ORDER];
     
     file_read_page(table_id, parent_pgnum, &parent);
     file_read_page(table_id, right_pgnum, &right);
@@ -280,7 +310,7 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
     temp[left_index].page_num = right_pgnum;
     temp[left_index].key = key;
 
-    split = 125;
+    split = ENTRY_ORDER / 2 + 1;
     new_pgnum = make_page(table_id);
     
     file_read_page(table_id, new_pgnum, &new_page);
@@ -294,7 +324,7 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
     }
     parent.entries[i - 1].page_num = temp[i - 1].page_num;
     k_prime = temp[split - 1].key;
-    for (++i, j = 0; i < 249; i++, j++) {
+    for (++i, j = 0; i < ENTRY_ORDER; i++, j++) {
         if (j) new_page.entries[j - 1].page_num = temp[i - 1].page_num;
         else new_page.this_num = this_num;
         new_page.entries[j].key = temp[i].key;
@@ -339,7 +369,7 @@ void insert_into_parent(int64_t table_id,
     }
     else {
         left_index = get_left_index(table_id, parent_pgnum, left_pgnum);
-        if (parent.num_keys < 248) {
+        if (parent.num_keys < ENTRY_ORDER - 1) {
             insert_into_page(table_id, parent_pgnum, left_index, key, right_pgnum);
         }
         else {
@@ -386,7 +416,7 @@ void start_new_tree(int64_t table_id, int64_t key, char* value, uint16_t val_siz
     root.slots[0].key = key;
     root.slots[0].size = val_size;
     root.slots[0].offset = PAGE_SIZE - val_size;
-    memmove(root.values + root.slots[0].offset - 128, value, val_size);
+    memmove(root.values + root.slots[0].offset - HEADER_SIZE, value, val_size);
 
     root.parent = 0;
     root.num_keys++;

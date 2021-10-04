@@ -81,6 +81,8 @@ int main() {
 	file_read_page(table_id, new_leaf_num, &new_leaf);
 	print_page(new_leaf);
 
+	print_leaves(table_id);
+
 	file_close_database_file();
 	remove("table1.dbdb");
 
@@ -91,12 +93,18 @@ int main() {
 int main() {
 	int table_id = file_open_database_file("table1.db");
 
-	insert(table_id, 2, (char*)"value", 60);
-	insert(table_id, 105, (char*)"12345", 50);
+	insert(table_id, 2, (char*)"val", 60);
+	insert(table_id, 105, (char*)"123", 50);
 	for (int i = 50; i < 103; i++) {
-		insert(table_id, i, (char*)"!@#$%", 60);
+		insert(table_id, i, (char*)"!@#", 60);
 	}
-	insert(table_id, 30, (char*)"abcde", 70);
+	insert(table_id, 30, (char*)"abc", 70);
+	insert(table_id, 40, (char*)"...", 80);
+	insert(table_id, 45, (char*)"---", 80);
+
+	// for (int i = 200; i < 250; i++) {
+	// 	insert(table_id, i, (char*)"ab", 70);
+	// }
 
 	page_t header;
 	file_read_page(table_id, 0, &header);
@@ -106,8 +114,7 @@ int main() {
 	file_read_page(table_id, header.root_num, &root);
 	print_page(root);
 
-	print_pgnum(table_id, 2559);
-	print_pgnum(table_id, 2558);
+	print_leaves(table_id);
 
 	file_close_database_file();
 

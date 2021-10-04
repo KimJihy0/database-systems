@@ -13,9 +13,6 @@
 #define PAGE_SIZE 0x1000 								// 4KiB
 #define INITIAL_FILESIZE (10 * 0x100000) 				// 10MiB
 #define INITIAL_PAGENUM (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
-#define SLOT_SIZE 12
-#define FREE_SPACE 3968
-#define OFFSET(X) ((X) - 128)
 
 int file_open_database_file(const char* pathname);
 pagenum_t file_alloc_page(int fd);
