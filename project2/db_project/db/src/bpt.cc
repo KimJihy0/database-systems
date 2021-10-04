@@ -1,6 +1,32 @@
 #include "../include/bpt.h"
 #include "../include/file.h"
 
+void print_page(page_t page) {
+	if (page.is_leaf) {
+		printf("-----leaf information-----\n");
+		printf("parent: %ld\n", page.parent);
+		printf("is_leaf: %d\n", page.is_leaf);
+		printf("num_keys: %d\n", page.num_keys);
+		printf("free_space: %ld\n", page.free_space);
+		printf("sibling: %ld\n", page.sibling);
+
+		for (int i = 0; i < page.num_keys; i++) {
+			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.values + page.slots[i].offset - 128);
+		}
+	}
+	else {
+		printf("-----page information-----\n");
+		printf("parent: %ld\n", page.parent);
+		printf("is_leaf: %d\n", page.is_leaf);
+		printf("num_keys: %d\n", page.num_keys);
+
+		printf("this_num: %ld\n", page.this_num);
+		for (int i = 0; i < page.num_keys; i++) {
+			printf("key: %3ld, page_num: %ld\n", page.entries[i].key, page.entries[i].page_num);
+		}
+	}
+}
+
 int64_t open_table(char* pathname) {
     int64_t table_id = file_open_database_file(pathname);
     return table_id;
@@ -136,13 +162,14 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
     total_size = 0;
     split = 0;
     offset = FREE_SPACE;
+    int gap = 124;
     for (i = 0, j = 0; i < leaf.num_keys; i++, j++) {
         if (j == insertion_index) {
-            offset -= val_size;
+            gap -= val_size;
             temp.slots[j].key = key;
             temp.slots[j].size = val_size;
-            temp.slots[j].offset = offset + 124 + 128;
-            memmove(temp.values + offset + 124, value, val_size);
+            temp.slots[j].offset = offset + gap + 128;
+            memmove(temp.values + offset + gap, value, val_size);
 
             total_size += (SLOT_SIZE + val_size);
             if (total_size < FREE_SPACE / 2) {
@@ -154,8 +181,8 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         offset -= leaf.slots[i].size;
         temp.slots[j].key = leaf.slots[i].key;
         temp.slots[j].size = leaf.slots[i].size;
-        temp.slots[j].offset = offset + 124 + 128;
-        memmove(temp.values + offset + 124 ,
+        temp.slots[j].offset = offset + gap + 128;
+        memmove(temp.values + offset + gap,
                 leaf.values + offset, leaf.slots[i].size);
 
         total_size += (SLOT_SIZE + leaf.slots[i].size);
@@ -180,13 +207,15 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         leaf.free_space -= (SLOT_SIZE + temp.slots[i].size);
     }
 
-    offset = FREE_SPACE;
+    int16_t new_offset;
+    new_offset = FREE_SPACE;
     for (i = split, j = 0; i <= num_keys; i++, j++) {
+        new_offset -= temp.slots[i].size;
         offset -= temp.slots[i].size;
         new_leaf.slots[j].key = temp.slots[i].key;
         new_leaf.slots[j].size = temp.slots[i].size;
-        new_leaf.slots[j].offset = offset + 128;
-        memmove(new_leaf.values + offset,
+        new_leaf.slots[j].offset = new_offset + 128;
+        memmove(new_leaf.values + new_offset,
                 temp.values + offset + 124, temp.slots[i].size);
         new_leaf.num_keys++;
         new_leaf.free_space -= (SLOT_SIZE + temp.slots[i].size);
@@ -197,6 +226,9 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
 
     new_leaf.parent = leaf.parent;
     new_key = new_leaf.slots[0].key;
+
+    // print_page(leaf);
+    // print_page(new_leaf);
 
     file_write_page(table_id, leaf_pgnum, &leaf);
     file_write_page(table_id, new_leaf_pgnum, &new_leaf);
@@ -289,8 +321,8 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
     insert_into_parent(table_id, parent_pgnum, k_prime, new_pgnum);
 }
 
-void insert_into_parent(int64_t table_id, pagenum_t left_pgnum,
-                        int64_t key, pagenum_t right_pgnum) {
+void insert_into_parent(int64_t table_id,
+                        pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum) {
     int left_index;
     pagenum_t parent_pgnum;
     page_t left, right, parent;

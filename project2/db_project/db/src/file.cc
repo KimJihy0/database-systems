@@ -23,6 +23,7 @@ int file_open_database_file(const char* path) {
 		page_t header;
 		header.free_num = INITIAL_PAGENUM - 1;
 		header.num_pages = INITIAL_PAGENUM;
+		header.root_num = 0;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 			perror("Failure to write");
