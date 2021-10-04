@@ -1,9 +1,20 @@
 #include "../include/bpt.h"
 #include "../include/file.h"
 
-void print_page(page_t page) {
+void print_header(page_t header) {
+	printf("-----header information-----\n");
+	printf("free_num: %ld\n", header.free_num);
+	printf("num_pages: %ld\n", header.num_pages);
+	printf("root_num: %ld\n", header.root_num);
+}
+
+void print_page(pagenum_t page_num, page_t page) {
 	if (page.is_leaf) {
-		printf("-----leaf information-----\n");
+        if (page.parent)
+		    printf("-----leaf information-----\n");
+        else
+            printf("-----root information-----\n");
+        printf("number: %ld\n", page_num);
 		printf("parent: %ld\n", page.parent);
 		printf("is_leaf: %d\n", page.is_leaf);
 		printf("num_keys: %d\n", page.num_keys);
@@ -15,7 +26,11 @@ void print_page(page_t page) {
 		}
 	}
 	else {
-		printf("-----page information-----\n");
+        if (page.parent)
+		    printf("-----page information-----\n");
+        else
+            printf("-----root information-----\n");
+        printf("number: %ld\n", page_num);
 		printf("parent: %ld\n", page.parent);
 		printf("is_leaf: %d\n", page.is_leaf);
 		printf("num_keys: %d\n", page.num_keys);
@@ -25,6 +40,35 @@ void print_page(page_t page) {
 			printf("key: %3ld, page_num: %ld\n", page.entries[i].key, page.entries[i].page_num);
 		}
 	}
+    printf("\n");
+}
+
+void print_pgnum(int64_t table_id, pagenum_t page_num) {
+	page_t page;
+	file_read_page(table_id, page_num, &page);
+	print_page(page_num, page);
+}
+
+void print_all(int64_t table_id) {
+    pagenum_t root_num, page_num;
+    page_t header, root, page;
+
+    file_read_page(table_id, 0, &header);
+    print_header(header);
+
+    root_num = header.root_num;
+    file_read_page(table_id, root_num, &root);
+    print_page(root_num, root);
+
+    page_num = root.this_num;
+    file_read_page(table_id, page_num, &page);
+    print_page(page_num, page);
+
+    for (int i = 0; i < root.num_keys; i++) {
+        page_num = root.entries[i].page_num;
+        file_read_page(table_id, page_num, &page);
+        print_page(page_num, page);
+    }
 }
 
 void print_leaves(int64_t table_id) {
@@ -46,6 +90,7 @@ void print_leaves(int64_t table_id) {
         temp_pgnum = temp.this_num;
         file_read_page(table_id, temp_pgnum, &temp);
     }
+    printf("-----leaves-----\n");
     while (true) {
         for (i = 0; i < temp.num_keys; i++) {
             printf("%ld:%s ", temp.slots[i].key, temp.values + temp.slots[i].offset - 128);
@@ -86,8 +131,8 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
             if (key >= temp.entries[i].key) i++;
             else break;
         }
-        if (i) temp_pgnum = temp.this_num;
-        else temp_pgnum = temp.entries[i - 1].page_num;
+        if (i) temp_pgnum = temp.entries[i - 1].page_num;
+        else temp_pgnum = temp.this_num;
         file_read_page(table_id, temp_pgnum, &temp);
     }
     return temp_pgnum;
@@ -128,7 +173,7 @@ int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnu
     if (parent.this_num != left_pgnum) {
         left_index++;
         while (left_index <= parent.num_keys &&
-                parent.entries[left_index].page_num != left_pgnum) {
+                parent.entries[left_index - 1].page_num != left_pgnum) {
             left_index++;
         }
     }
@@ -193,25 +238,28 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
         insertion_index++;
     }
 
+    // printf("\n");
+    // printf("leaf.num_keys: %d\n", leaf.num_keys);
+    // for (int i = 0; i < leaf.num_keys; i++) {
+    //     printf("%ld, ", leaf.slots[i].key);
+    // }
+    // printf("\n");
+
     total_size = 0;
     split = 0;
     gap = SLOT_SIZE  + VALUE_SIZE;
     offset = FREE_SPACE;
+    new_offset = 0;
     for (i = 0, j = 0; i < leaf.num_keys; i++, j++) {
         if (j == insertion_index) {
             gap -= val_size;
-            temp.slots[j].key = key;
-            temp.slots[j].size = val_size;
-            temp.slots[j].offset = offset + gap + HEADER_SIZE;
-            memmove(temp.values + offset + gap, value, val_size);
-
+            new_offset = offset;
             total_size += (SLOT_SIZE + val_size);
             if (total_size < FREE_SPACE / 2) {
                 split++;
             }
             j++;
         }
-
         offset -= leaf.slots[i].size;
         temp.slots[j].key = leaf.slots[i].key;
         temp.slots[j].size = leaf.slots[i].size;
@@ -224,6 +272,19 @@ void insert_into_leaf_after_splitting(int64_t table_id, pagenum_t leaf_pgnum,
             split++;
         }
     }
+    temp.slots[insertion_index].key = key;
+    temp.slots[insertion_index].size = val_size;
+    temp.slots[insertion_index].offset = new_offset + gap + HEADER_SIZE;
+    if (new_offset == 0) new_offset = offset - val_size;
+    memmove(temp.values + new_offset + gap, value, val_size); 
+
+    // if (temp.slots[split].key == 219) {
+    //     printf("--지금지금지금지금지금지금------\n");
+    //     for (int i = 0; i < 65; i++) {
+    //         printf("%ld, ", temp.slots[i].key);
+    //     }
+    //     printf("\n");
+    // }
 
     num_keys = leaf.num_keys;
     leaf.num_keys = 0;
@@ -298,7 +359,7 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
 
     for (i = 0, j = 0; i < parent.num_keys + 1; i++, j++) {
         if (j == left_index + 1) j++;
-        if (j) temp[j - 1].key = parent.entries[j - 1].key;
+        if (j) temp[j - 1].page_num = parent.entries[i - 1].page_num;
         else this_num = parent.this_num;
     }
 
@@ -326,12 +387,15 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t parent_pgnum, 
     k_prime = temp[split - 1].key;
     for (++i, j = 0; i < ENTRY_ORDER; i++, j++) {
         if (j) new_page.entries[j - 1].page_num = temp[i - 1].page_num;
-        else new_page.this_num = this_num;
+        else new_page.this_num = temp[i- 1].page_num;
         new_page.entries[j].key = temp[i].key;
         new_page.num_keys++;
     }
     new_page.entries[j - 1].page_num = temp[i - 1].page_num;
     new_page.parent = parent.parent;
+
+    file_write_page(table_id, new_pgnum, &new_page);
+
     for (i = 0; i <= new_page.num_keys; i++) {
         if (i) {
             file_read_page(table_id, new_page.entries[i - 1].page_num, &child);
@@ -443,8 +507,10 @@ void insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     }
     else {
         leaf_pgnum = find_leaf(table_id, key);
-
+        
         file_read_page(table_id, leaf_pgnum, &leaf);
+
+        // printf("leaf_pgnum: %ld\n", leaf_pgnum);
 
         if (leaf.free_space >= SLOT_SIZE + val_size) {
             insert_into_leaf(table_id, leaf_pgnum, key, value, val_size);

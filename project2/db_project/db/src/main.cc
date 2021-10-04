@@ -2,12 +2,7 @@
 #include "file.cc"
 
 
-void print_header(page_t header) {
-	printf("-----header information-----\n");
-	printf("free_num: %ld\n", header.free_num);
-	printf("num_pages: %ld\n", header.num_pages);
-	printf("root_num: %ld\n", header.root_num);
-}
+
 
 // void print_page(page_t page) {
 // 	if (page.is_leaf) {
@@ -35,11 +30,6 @@ void print_header(page_t header) {
 // 	}
 // }
 
-void print_pgnum(int64_t table_id, pagenum_t page_num) {
-	page_t page;
-	file_read_page(table_id, page_num, &page);
-	print_page(page);
-}
 
 #if 0
 int main() {
@@ -93,28 +83,36 @@ int main() {
 int main() {
 	int table_id = file_open_database_file("table1.db");
 
-	insert(table_id, 2, (char*)"val", 60);
-	insert(table_id, 105, (char*)"123", 50);
-	for (int i = 50; i < 103; i++) {
-		insert(table_id, i, (char*)"!@#", 60);
+	insert(table_id, 2, (char*)"++", 60);
+	insert(table_id, 105, (char*)"01", 50);
+	for (int i = 49; i < 102; i++) {
+		insert(table_id, i, (char*)"!@", 60);
 	}
-	insert(table_id, 30, (char*)"abc", 70);
-	insert(table_id, 40, (char*)"...", 80);
-	insert(table_id, 45, (char*)"---", 80);
+	insert(table_id, 30, (char*)"ab", 70);
+	insert(table_id, 40, (char*)"..", 80);
+	insert(table_id, 45, (char*)"--", 80);
 
-	// for (int i = 200; i < 250; i++) {
-	// 	insert(table_id, i, (char*)"ab", 70);
-	// }
+	for (int i = 200; i < 220; i++) {
+		insert(table_id, i, (char*)"<>", 70);
+	}
+	insert(table_id, 220, (char*)"()", 50);
+	for (int i = 350; i < 9000; i++) {
+		insert(table_id, i, (char*)"**", 50);
+	}
+	insert(table_id, 250, (char*)"Tlqkf", 50);
+	insert(table_id, 300, (char*)"fuck", 50);
+
+	// print_leaves(table_id);
 
 	page_t header;
 	file_read_page(table_id, 0, &header);
-	print_header(header);
 
 	page_t root;
 	file_read_page(table_id, header.root_num, &root);
-	print_page(root);
 
-	print_leaves(table_id);
+	print_page(header.root_num, root);
+
+	print_pgnum(table_id, 2433);
 
 	file_close_database_file();
 
