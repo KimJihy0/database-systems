@@ -12,13 +12,14 @@
 typedef uint64_t pagenum_t;
 
 int64_t open_table(char* pathname);
+int init_db();
+int shutdown_db();
 
-// void print_header(page_t header);
-// void print_page(pagenum_t page_num, page_t page);
-// void print_pgnum(int64_t table_id, pagenum_t page_num);
-// void print_all(int64_t table_id);
-// void print_leaves(int64_t table_id);
+void print_page(pagenum_t page_num, page_t page);
+void print_pgnum(int64_t table_id, pagenum_t page_num);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
+int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size);
+
 
 pagenum_t make_page(int64_t table_id);
 pagenum_t make_leaf(int64_t table_id);
@@ -36,7 +37,7 @@ void insert_into_parent(int64_t table_id,
 void insert_into_new_root(int64_t table_id,
                           pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum);
 void start_new_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size);
-void insert(int64_t table_id, int64_t key, char* value, uint16_t val_size);
+int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size);
 
 
 #endif /* __BPT_H__*/
