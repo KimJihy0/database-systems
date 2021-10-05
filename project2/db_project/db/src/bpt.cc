@@ -15,7 +15,7 @@ int64_t open_table(char* pathname) {
  * If success, returns 0. Otherwise, returns -1. 
  */
 int init_db() {
-    open_table("my_db.db");
+    open_table((char*)"my_db.db");
     return 0;
 }
 
@@ -28,55 +28,6 @@ int shutdown_db() {
 }
 
 // OUTPUT AND UTILITIES
-
-void print_page(pagenum_t page_num, page_t page) {
-    if (page_num == 0) {
-        printf("-----header information-----\n");
-        printf("free_num: %ld\n", page.free_num);
-        printf("num_pages: %ld\n", page.num_pages);
-        printf("root_num: %ld\n", page.root_num);
-        printf("\n");
-        return;
-    }
-	if (page.is_leaf) {
-        if (page.parent)
-		    printf("-----leaf information-----\n");
-        else
-            printf("-----root information-----\n");
-        printf("number: %ld\n", page_num);
-		printf("parent: %ld\n", page.parent);
-		printf("is_leaf: %d\n", page.is_leaf);
-		printf("num_keys: %d\n", page.num_keys);
-		printf("free_space: %ld\n", page.free_space);
-		printf("sibling: %ld\n", page.sibling);
-
-		for (int i = 0; i < page.num_keys; i++) {
-			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.values + page.slots[i].offset - HEADER_SIZE);
-		}
-	}
-	else {
-        if (page.parent)
-		    printf("-----page information-----\n");
-        else
-            printf("-----root information-----\n");
-        printf("number: %ld\n", page_num);
-		printf("parent: %ld\n", page.parent);
-		printf("is_leaf: %d\n", page.is_leaf);
-		printf("num_keys: %d\n", page.num_keys);
-
-		printf("left_child: %ld\n", page.left_child);
-		for (int i = 0; i < page.num_keys; i++) {
-			printf("key: %3ld, child: %ld\n", page.entries[i].key, page.entries[i].child);
-		}
-	}
-    printf("\n");
-}
-
-void print_pgnum(int64_t table_id, pagenum_t page_num) {
-	page_t page;
-	file_read_page(table_id, page_num, &page);
-	print_page(page_num, page);
-}
 
 /* Traces the path from the root to a leaf, searching by key.
  * Returns a page # of the leaf containg the given key.
@@ -95,8 +46,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
             if (key >= temp.entries[i].key) i++;
             else break;
         }
-        if (i) temp_pgnum = temp.entries[i - 1].child;
-        else temp_pgnum = temp.left_child;
+        temp_pgnum = i ? temp.entries[i - 1].child : temp.left_child;
         file_read_page(table_id, temp_pgnum, &temp);
     }
     return temp_pgnum;
@@ -547,3 +497,6 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
     return 0;
 }
+
+// Deletion
+
