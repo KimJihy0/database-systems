@@ -80,7 +80,7 @@ void print_pgnum(int64_t table_id, pagenum_t page_num) {
 
 /* Traces the path from the root to a leaf, searching by key.
  * Returns a page # of the leaf containg the given key.
-*/
+ */
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
     int i;
     pagenum_t temp_pgnum;
@@ -120,7 +120,8 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
     }
     if (i == page.num_keys) return -1;
     
-    memmove(ret_val, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
+    memmove(ret_val, page.values + page.slots[i].offset - HEADER_SIZE,
+            page.slots[i].size);
     *val_size = page.slots[i].size;
     return 0;
 }
@@ -166,14 +167,12 @@ int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnu
     page_t parent;
     file_read_page(table_id, parent_pgnum, &parent);
     left_index = 0;
-    if (parent.left_child != left_pgnum) {
+    if (parent.left_child == left_pgnum) return left_index;
+    while (left_index < parent.num_keys - 1 &&
+           parent.entries[left_index].child != left_pgnum) {
         left_index++;
-        while (left_index < parent.num_keys &&
-                parent.entries[left_index - 1].child != left_pgnum) {
-            left_index++;
-        }
     }
-    return left_index;
+    return ++left_index;
 }
 
 /* Inserts new key & value into a leaf.
@@ -347,11 +346,10 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t old_pgnum, int
      * the other half to the new page.
     */
 
-    // need to cleanup
-    for (i = 0, j = 0; i < old_page.num_keys + 1; i++, j++) {
-        if (j == left_index + 1) j++;
-        if (j) temp[j - 1].child = old_page.entries[i - 1].child;
-        else left_child = old_page.left_child;
+    left_child = old_page.left_child;
+    for (i = 0, j = 0; i < old_page.num_keys; i++, j++) {
+        if (j == left_index) j++;
+        temp[j].child = old_page.entries[i].child;
     }
     for (i = 0, j = 0; i < old_page.num_keys; i++, j++) {
         if (j == left_index) j++;
@@ -387,20 +385,17 @@ void insert_into_page_after_splitting(int64_t table_id, pagenum_t old_pgnum, int
     }
     new_page.entries[j - 1].child = temp[i - 1].child;
     new_page.parent = old_page.parent;
-    for (i = 0; i <= new_page.num_keys; i++) {
-        if (i) {
-            file_read_page(table_id, new_page.entries[i - 1].child, &child);
-            child.parent = new_pgnum;
-            file_write_page(table_id, new_page.entries[i - 1].child, &child);
-        }
-        else {
-            file_read_page(table_id, new_page.left_child, &child);
-            child.parent = new_pgnum;
-            file_write_page(table_id, new_page.left_child, &child);
-        }
+
+    file_read_page(table_id, new_page.left_child, &child);
+    child.parent = new_pgnum;
+    file_write_page(table_id, new_page.left_child, &child);
+    for (i = 0; i < new_page.num_keys; i++) {
+        file_read_page(table_id, new_page.entries[i].child, &child);
+        child.parent = new_pgnum;
+        file_write_page(table_id, new_page.entries[i].child, &child);
     }
     
-    file_write_page(table_id, new_pgnum, &new_page); // for문 위로?
+    file_write_page(table_id, new_pgnum, &new_page);
     file_write_page(table_id, old_pgnum, &old_page);
 
     /* Insert a new key into the parent of the two
@@ -448,7 +443,8 @@ void insert_into_parent(int64_t table_id,
     /* Harder case: split a node by insertion rule.
      */
     else {
-        insert_into_page_after_splitting(table_id, parent_pgnum, left_index, key, right_pgnum);
+        insert_into_page_after_splitting(table_id, parent_pgnum, left_index,
+                                         key, right_pgnum);
     }
     
 }
