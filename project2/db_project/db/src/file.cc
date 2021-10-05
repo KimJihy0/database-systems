@@ -3,12 +3,12 @@
 file* files;
 
 // Open existing database file or create one if not existed
-int file_open_database_file(const char* path) {
+int file_open_database_file(const char* pathname) {
 	int fd;
-	fd = open(path, O_RDWR|O_CREAT|O_EXCL);
+	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL);
 	// file exists
 	if (fd < 0 && errno == EEXIST) {
-		fd = open(path, O_RDWR);
+		fd = open(pathname, O_RDWR);
 		if (fd < 0) {
 			perror("Failure to open database file");
 			exit(1);
