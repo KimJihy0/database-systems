@@ -15,7 +15,7 @@ int64_t open_table(char* pathname);
 int init_db();
 int shutdown_db();
 
-void print_page(pagenum_t page_num, page_t page);
+// void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
 int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size);

@@ -40,7 +40,14 @@ int main() {
 	print_pgnum(table_id, 2306);
 	print_pgnum(table_id, 2146);
 
+	char ret_value[100];
+	uint16_t val_size;
 
-	file_close_database_file();
+	db_find(table_id, 220, ret_value, &val_size);
+
+	printf("value: %s\n",ret_value);
+	printf("size: %d\n", val_size);
+
+	shutdown_db();
 	remove("table1.db");
 }
