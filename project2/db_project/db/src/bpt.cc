@@ -505,7 +505,7 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
 }
 
 void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
-                            int64_t key, pagenum_t child_pgnum) {
+                      int64_t key, pagenum_t child_pgnum) {
     page_t p;
     int i;
 
@@ -568,15 +568,12 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int key_index) {
 }
 
 void delete_from_leaf_merge(int64_t table_id, pagenum_t leaf_pgnum,
-                            pagenum_t sibling_pgnum, int sibling_index,
-                            int64_t k_prime, int key_index) {
+                            pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     pagenum_t temp_pgnum;
     page_t leaf, sibling;
     int i, j;
     uint16_t sibling_offset, leaf_offset;
     int leaf_size, sibling_size;
-
-    delete_from_leaf(table_id, leaf_pgnum, key_index);
 
     if (sibling_index == -1) {
         file_read_page(table_id, sibling_pgnum, &leaf);
@@ -612,21 +609,18 @@ void delete_from_leaf_merge(int64_t table_id, pagenum_t leaf_pgnum,
 }
 
 void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
-                             pagenum_t sibling_pgnum, int sibling_index,
-                             int k_prime_index, int64_t k_prime, int key_index) {
+                             pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
     page_t leaf, sibling, parent;
     int i, rotation_index, rotation_size;
     int16_t offset;
 
     file_read_page(table_id, sibling_pgnum, &sibling);
-
-    delete_from_leaf(table_id, leaf_pgnum, key_index);
+    file_read_page(table_id, leaf_pgnum, &leaf);
 
     offset = leaf.free_space + SLOT_SIZE * leaf.num_keys;
     for (rotation_index = sibling.num_keys - 1; rotation_index >= 0; rotation_index--) {
         file_read_page(table_id, leaf_pgnum, &leaf);
         file_read_page(table_id, sibling_pgnum, &sibling);
-        file_read_page(table_id, leaf.parent, &parent);
 
         if (leaf.free_space < 2500) break;
 
@@ -644,18 +638,21 @@ void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
                 sibling.values + sibling.slots[rotation_index].offset - HEADER_SIZE,
                 rotation_size);
         
-        // parent.entries[k_prime_index].key = leaf.slots[0].key;
         leaf.num_keys++;
         leaf.free_space -= (SLOT_SIZE + rotation_size);
 
         delete_from_leaf(table_id, sibling_pgnum, rotation_index);
 
         file_write_page(table_id, leaf_pgnum, &leaf);
-        file_write_page(table_id, leaf.parent, &parent);
     }
+    
+    file_read_page(table_id, leaf.parent, &parent);
+    parent.entries[k_prime_index].key = leaf.slots[0].key;
+    file_write_page(table_id, leaf.parent, &parent);
 }
 
-void delete_from_child(int64_t table_id, pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
+void delete_from_child(int64_t table_id,
+                       pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
 
 }
 
@@ -682,17 +679,21 @@ int db_delete(int64_t table_id, int64_t key) {
     while (leaf.slots[i].key != key) i++;
     val_size = leaf.slots[i].size;
 
-    if (leaf.free_space + SLOT_SIZE + val_size < 2500) {
-        delete_from_leaf(table_id, leaf_pgnum, i); // i?
-    }
-    else if (sibling.free_space + leaf.free_space >= FREE_SPACE + SLOT_SIZE + val_size) {
+    delete_from_leaf(table_id, leaf_pgnum, i);
+
+    file_read_page(table_id, leaf_pgnum, &leaf);
+
+    if (leaf.free_space < 2500) return 0;
+
+    if (sibling.free_space + leaf.free_space >= FREE_SPACE) {
         delete_from_leaf_merge(table_id, leaf_pgnum,
-                               sibling_pgnum, sibling_index, k_prime, i);
+                               sibling_pgnum, sibling_index, k_prime);
     }
     else {
-        delete_from_leaf_rotate(table_id, leaf_pgnum, sibling_pgnum, sibling_index,
-                                k_prime_index, k_prime, i);
+        delete_from_leaf_rotate(table_id, leaf_pgnum,
+                                sibling_pgnum, sibling_index, k_prime_index);
     }
+
     return 0;
 }
 
@@ -702,8 +703,8 @@ void insert_into_leaf_split();
 void insert_into_page();
 void insert_into_page_split();
 void insert_into_parent();
-void insert_into_new_root();
-void start_new_tree();
+void insert_adjust_root();
+void start_tree();
 void db_insert();
 
 void remove_from_leaf();
@@ -713,6 +714,7 @@ void remove_from_page();
 void remove_from_page_merge();
 void remove_from_page_rotate();
 void remove_from_chlid();
-void adjust_root();
+void remove_adjust_root();
 void destroy_tree();
+
 void db_delete();
