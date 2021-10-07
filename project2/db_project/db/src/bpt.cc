@@ -6,7 +6,7 @@
  * If success, returns the unique table id.
  * Otherwise, returns -1.
  */
-int64_t open_table(char* pathname) {
+int64_t open_table(const char* pathname) {
     int64_t table_id = file_open_database_file(pathname);
     return table_id;
 }
@@ -15,7 +15,7 @@ int64_t open_table(char* pathname) {
  * If success, returns 0. Otherwise, returns -1. 
  */
 int init_db() {
-    open_table((char*)"my_db.db");
+    open_table("JihyoSQL.db");
     return 0;
 }
 
@@ -56,7 +56,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
  * Stores value & size corresponding to the key.
  * If success, returns 0. Otherwise, returns -1.
  */
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
+int db_find(int64_t table_id, int64_t key, char* ret_val = NULL, uint16_t* val_size = NULL) {
     pagenum_t page_num;
     page_t page;
     int i;
@@ -70,6 +70,8 @@ int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size) {
     }
     if (i == page.num_keys) return -1;
     
+    if (ret_val == NULL || val_size == NULL) return 1;
+
     memmove(ret_val, page.values + page.slots[i].offset - HEADER_SIZE,
             page.slots[i].size);
     *val_size = page.slots[i].size;
@@ -108,7 +110,7 @@ pagenum_t make_leaf(int64_t table_id) {
     return leaf_pgnum;
 }
 
-/* Hepler function used in insert_into_parent
+/* Hepler function for insertion
  * to find the index of the parent's child to
  * the page to the left of the key to be inserted.
  */
@@ -125,7 +127,7 @@ int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnu
     return ++left_index;
 }
 
-/* Inserts new key & value into a leaf.
+/* Inserts new record into a leaf.
  */
 void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
                       int64_t key, char* value, uint16_t val_size) {
@@ -157,7 +159,7 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
     file_write_page(table_id, leaf_pgnum, &leaf);
 }
 
-/* Inserts new key & value into a leaf so as to exceed
+/* Inserts new record into a leaf so as to exceed
  * the page's size, causing the leaf to be split in half.
  */
 void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
@@ -239,7 +241,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     insert_into_parent(table_id, leaf_pgnum, new_key, new_pgnum);
 }
 
-/* Insert new key & child into a page.
+/* Insert new entry into a page.
  */
 void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
                       int left_index, int64_t key, pagenum_t right_pgnum) {
@@ -260,7 +262,7 @@ void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
     file_write_page(table_id, p_pgnum, &p);
 }
 
-/* Inserts new key & child into a page so as to exceed
+/* Inserts new entry into a page so as to exceed
  * the entry order, causing the page to be split in half.
  */
 void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
@@ -274,11 +276,11 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     file_read_page(table_id, old_pgnum, &old_page);
     file_read_page(table_id, right_pgnum, &right);
 
-    /* First create a temporary set of keys & childs
+    /* First create a temporary set of entries
      * to hold everything in order, including
-     * the new key & child, inserted in right places.
+     * the new entry, inserted in right places.
      * Then create a new page and copy half of the
-     * keys & childs to the old page and
+     * entries to the old page and
      * the other half to the new page.
     */
 
@@ -295,7 +297,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     temp[left_index].key = key;
 
     /* Create the new page and copy
-     * half the keys & childs to the
+     * half the entries to the
      * old and half to the new.
      */
 
@@ -304,7 +306,6 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
 
     file_read_page(table_id, new_pgnum, &new_page);
     
-    // 약간의 조정했음. 문제시 수정.
     old_page.num_keys = 0;
     old_page.left_child = left_child;
     for (i = 0; i < split - 1; i++) {
@@ -312,16 +313,13 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
         old_page.entries[i].key = temp[i].key;
         old_page.num_keys++;
     }
-    // 이것도 수정하면 좋을듯
     k_prime = temp[split - 1].key;
+    new_page.left_child = temp[i].child;
     for (++i, j = 0; i < ENTRY_ORDER; i++, j++) {
-        if (j) new_page.entries[j - 1].child = temp[i - 1].child;
-        else new_page.left_child = temp[i- 1].child;
+        new_page.entries[j].child = temp[i].child;
         new_page.entries[j].key = temp[i].key;
         new_page.num_keys++;
     }
-    new_page.entries[j - 1].child = temp[i - 1].child;
-    new_page.parent = old_page.parent;
 
     file_read_page(table_id, new_page.left_child, &child);
     child.parent = new_pgnum;
@@ -440,20 +438,23 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 }
 
 /* Master insertion function.
- * Inserts key & value into data file at the right place.
+ * Inserts a new reocrd into data file,
+ * and adjusts tree by insertion rule.
  * If success, returns 0. Otherwise, returns -1.
  */
 int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     pagenum_t leaf_pgnum;
     page_t leaf, header;
 
-    // Duplicate?
-
-    file_read_page(table_id, 0, &header);
+    /* The current implementation ignores
+     * duplicates.
+     */
+    if (db_find(table_id, key) == 1) return -1;
 
     /* Case: the tree does not exist yet.
      * Start a new tree.
      */
+    file_read_page(table_id, 0, &header);
     if (header.root_num == 0) {
         start_tree(table_id, key, value, val_size);
         return 0;
@@ -486,6 +487,11 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
 // Deletion
 
+/* Helper function for deletion
+ * to find the index of the page's nearest
+ * sibling to the left if one exists.
+ * If not (page is leftmost) returns -1.
+ */
 int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
     page_t p, parent;
     int i;
@@ -501,6 +507,8 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
     exit(EXIT_FAILURE);
 }
 
+/* Deletes a record from the leaf.
+ */
 void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     page_t leaf;
     int i, key_index;
@@ -511,10 +519,15 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     key_index = 0;
     while (leaf.slots[key_index].key != key) key_index++;
     
+    /* Size and offset of values for packing
+     * them after deletion.
+     */
     val_size = leaf.slots[key_index].size;
     deletion_offset = leaf.slots[key_index].offset - HEADER_SIZE;
     insertion_offset = leaf.free_space + SLOT_SIZE * leaf.num_keys;
 
+    /* Remove the record and shift other records accordingly.
+     */
     for (i = key_index + 1; i < leaf.num_keys; i++) {
         leaf.slots[i - 1].key = leaf.slots[i].key;
         leaf.slots[i - 1].size = leaf.slots[i].size;
@@ -527,6 +540,9 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     leaf.num_keys--;
     leaf.free_space += (SLOT_SIZE + val_size);
 
+    /* Adjust of offset of the record
+     * whose value is packed.
+     */
     for (i = 0; i < leaf.num_keys; i++) {
         if (leaf.slots[i].offset - HEADER_SIZE < deletion_offset) {
             leaf.slots[i].offset += val_size;
@@ -536,12 +552,17 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     file_write_page(table_id, leaf_pgnum, &leaf);
 }
 
+/* Merges a leaf with a sibling leaf.
+ */
 void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                   pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     page_t leaf, sibling;
     int i, j, leaf_size, sibling_size;
     uint16_t leaf_offset, sibling_offset;
 
+    /* Swap sibling with leaf if leaf is on the
+     * extreme left and sibling is to its right.
+     */
     if (sibling_index != -1) {
         file_read_page(table_id, leaf_pgnum, &leaf);
         file_read_page(table_id, sibling_pgnum, &sibling);
@@ -551,11 +572,18 @@ void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
         file_read_page(table_id, leaf_pgnum, &sibling);
     }
 
-    sibling_offset = sibling.free_space + SLOT_SIZE * sibling.num_keys;
+    /* Size and offset of values for copying
+     * them from leaf to sibling.
+     */
     sibling_size = FREE_SPACE - sibling_offset;
-    leaf_offset = leaf.free_space + SLOT_SIZE * leaf.num_keys;
+    sibling_offset = sibling.free_space + SLOT_SIZE * sibling.num_keys;
     leaf_size = FREE_SPACE - leaf_offset;
+    leaf_offset = leaf.free_space + SLOT_SIZE * leaf.num_keys;
 
+    /* Append the records of leaf to the sibling.
+     * Set the sibling's sibling to
+     * what head been leaf's sibling
+     */
     for (i = 0, j = sibling.num_keys; i < leaf.num_keys; i++, j++) {
         sibling.slots[j].key = leaf.slots[i].key;
         sibling.slots[j].size = leaf.slots[i].size;
@@ -565,17 +593,15 @@ void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
     }
     memmove(sibling.values + sibling_offset - leaf_size,
             leaf.values + leaf_offset, leaf_size);
-
-    // 의미없는 정보수정(임시)
-    leaf.num_keys = 0;
-    leaf.free_space = FREE_SPACE;
-
-    file_write_page(table_id, leaf_pgnum, &leaf);
-    file_write_page(table_id, sibling_pgnum, &sibling);
+    sibling.sibling = leaf.sibling;
 
     delete_from_child(table_id, leaf.parent, k_prime, leaf_pgnum);
+    file_free_page(table_id, leaf_pgnum);
+    file_write_page(table_id, sibling_pgnum, &sibling);
 }
 
+/* Redistributes leaves.
+ */
 void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                          pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
     page_t leaf, sibling, parent;
@@ -585,6 +611,9 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
     file_read_page(table_id, leaf_pgnum, &leaf);
     file_read_page(table_id, sibling_pgnum, &sibling);
 
+    /* Pull records from sibling
+     * until its free space is under threshold.
+     */
     while (leaf.free_space >= 2500) {
         src_index = (sibling_index != -1) ? sibling.num_keys - 1 : 0;
         dst_index = (sibling_index != -1) ? 0 : leaf.num_keys;
@@ -622,6 +651,8 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
     file_write_page(table_id, leaf.parent, &parent);
 }
 
+/* Deletes an entry from the page.
+ */
 void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
                       int64_t key, pagenum_t child_pgnum) {
     page_t p;
@@ -629,20 +660,24 @@ void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
 
     file_read_page(table_id, p_pgnum, &p);
 
+    /* Remove the key and shift other keys accordingly.
+     */
     i = 0;
     while (p.entries[i].key != key) i++;
     for (++i; i < p.num_keys; i++) {
         p.entries[i - 1].key = p.entries[i].key;
     }
 
+    /* Remove the child and shift other childs accordingly.
+     */
     i = 0;
     if (p.left_child != child_pgnum) {
         i++;
         while (p.entries[i - 1].child != child_pgnum) i++;
     }
-    for (++i; i <= p.num_keys; i++) {
-        if (i == 1) p.left_child = p.entries[i - 1].child;
-        else p.entries[i - 2].child = p.entries[i - 1].child;
+    for (; i <= p.num_keys; i++) {
+        if (i == 0) p.left_child = p.entries[0].child;
+        else p.entries[i - 1].child = p.entries[i].child;
     }
 
     p.num_keys--;
@@ -650,11 +685,16 @@ void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
     file_write_page(table_id, p_pgnum, &p);
 }
 
+/* Merges a page with a sibling page.
+ */
 void merge_pages(int64_t table_id, pagenum_t p_pgnum,
                  pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     page_t p, sibling, nephew;
     int i, j, sibling_insertion_index, p_end;
     
+    /* Swap sibling with page if page is on the
+     * extreme left and sibling is to its right.
+     */
     if (sibling_index != -1) {
         file_read_page(table_id, p_pgnum, &p);
         file_read_page(table_id, sibling_pgnum, &sibling);
@@ -664,21 +704,28 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
         file_read_page(table_id, p_pgnum, &sibling);
     }
 
+    /* Starting point in the sibling for copying
+     * entries from n.
+     */
     sibling_insertion_index = sibling.num_keys;
 
+    /* Append k_prime.
+     */
     sibling.entries[sibling_insertion_index].key = k_prime;
     sibling.num_keys++;
 
+    /* Merge.
+     */
     p_end = p.num_keys;
-    // 약간의 조정했음. 문제시 수정
     for (i = sibling_insertion_index + 1, j = 0; j < p_end; i++, j++) {
         sibling.entries[i].key = p.entries[j].key;
         sibling.entries[i].child = p.entries[j].child;
         sibling.num_keys++;
-        p.num_keys--; //의미있는 정보수정?
     }
     sibling.entries[sibling_insertion_index].child = p.left_child;
 
+    /* All children must now point up to the same parnet.
+     */
     file_read_page(table_id, sibling.left_child, &nephew);
     nephew.parent = sibling_pgnum;
     file_write_page(table_id, sibling.left_child, &nephew);
@@ -688,12 +735,13 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
         file_write_page(table_id, sibling.entries[i].child, &nephew);
     }
 
-    file_write_page(table_id, p_pgnum, &p);
-    file_write_page(table_id, sibling_pgnum, &sibling);
-
     delete_from_page(table_id, p.parent, k_prime, p_pgnum);
+    file_free_page(table_id, p_pgnum);
+    file_write_page(table_id, sibling_pgnum, &sibling);
 }
 
+/* Redistributes pages.
+ */
 void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
                         pagenum_t sibling_pgnum, int sibling_index,
                         int k_prime_index, int64_t k_prime) {
@@ -703,6 +751,10 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
     file_read_page(table_id, p_pgnum, &p);
     file_read_page(table_id, sibling_pgnum, &sibling);
 
+    /* Case : p has a sibling to the left.
+     * Pull the sibling's last entry over
+     * from the sibling's right end to p's left end.
+     */
     if (sibling_index != -1) {
         for (i = p.num_keys; i > 0; i--) {
             p.entries[i].key = p.entries[i - 1].key;
@@ -720,6 +772,12 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
         parent.entries[k_prime_index].key = p.entries[0].key;
         file_write_page(table_id, p.parent, &parent);
     }
+
+    /* Case: p is the leftmost child.
+     * Take a entry from the sibling to the right.
+     * Move the sibling's leftmost entry
+     * to p's rightmost position.
+     */
     else {
         p.entries[p.num_keys].key = k_prime;
         p.entries[p.num_keys].child = sibling.left_child;
@@ -745,6 +803,9 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
     file_write_page(table_id, sibling_pgnum, &sibling);
 }
 
+/* Deletes an entry from data file
+ * and adjusts tree by deletion rule.
+ */
 void delete_from_child(int64_t table_id,
                        pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
     pagenum_t sibling_pgnum;
@@ -757,15 +818,25 @@ void delete_from_child(int64_t table_id,
     file_read_page(table_id, p_pgnum, &p);
     file_read_page(table_id, p.parent, &parent);
 
+    /* Case: deletion from the root.
+     */
     if (p.parent == 0) {
         if (p.num_keys > 0) return;
         adjust_root(table_id, p_pgnum);
         return;
     }
 
+    /* Case: page stays at or above minimum.
+     * Nothing to do.
+     */
     if (p.num_keys >= ENTRY_ORDER / 2) {
         return;
     }
+
+    /* Case: page is under minimum.
+     * Need to be merged or redistributed.
+     * (Rest of function body)
+     */
 
     sibling_index = get_sibling_index(table_id, p_pgnum);
     k_prime_index = (sibling_index != -1) ? sibling_index : 0;
@@ -776,15 +847,25 @@ void delete_from_child(int64_t table_id,
 
     file_read_page(table_id, sibling_pgnum, &sibling);
     
+    /* Case: sibling can accept additional entries.
+     * Need to be merged.
+     */
     if (sibling.num_keys + p.num_keys < ENTRY_ORDER - 1) {
         merge_pages(table_id, p_pgnum, sibling_pgnum, sibling_index, k_prime);
     }
+
+    /* Case: page cannot be merged.
+     * Need to be redistributed.
+     */
     else {
         redistribute_pages(table_id, p_pgnum,
                            sibling_pgnum, sibling_index, k_prime_index, k_prime);
     }
 }
 
+/* Promotes the first (only) child
+ * as the new root.
+ */
 void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
     page_t root, new_root, header;
 
@@ -800,6 +881,8 @@ void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
     file_write_page(table_id, root.left_child, &new_root);
 }
 
+/* Destorys a tree.
+ */
 void destroy_tree(int64_t table_id, pagenum_t root_pgnum) {
     page_t header;
 
@@ -811,27 +894,46 @@ void destroy_tree(int64_t table_id, pagenum_t root_pgnum) {
     file_free_page(table_id, root_pgnum);
 }
 
+/* Master deletion function.
+ * Deletes a record from data file
+ * and adjusts tree by deletion rule.
+ * If success, returns 0. Otherwise, returns -1.
+ */
 int db_delete(int64_t table_id, int64_t key) {
     pagenum_t leaf_pgnum, sibling_pgnum;
     page_t leaf, sibling, parent;
     int sibling_index, k_prime_index;
     int64_t k_prime;
 
+    /* If the record exists, find leaf
+     * and delete the record from laaf.
+     */
+    if (db_find(table_id, key) == -1) return -1;
     leaf_pgnum = find_leaf(table_id, key);
     delete_from_leaf(table_id, leaf_pgnum, key);
 
     file_read_page(table_id, leaf_pgnum, &leaf);
     file_read_page(table_id, leaf.parent, &parent);
 
+    /* Case: deletion from the root.
+     */
     if (leaf.parent == 0) {
         if (leaf.num_keys > 0) return 0;
         destroy_tree(table_id, leaf_pgnum);
         return 0;
     }
 
+    /* Case: free space is under threshold.
+     * Nothing to do.
+     */
     if (leaf.free_space < 2500) {
         return 0;
     }
+
+    /* Case: free space exceeds threshold.
+     * Need to be merged or redistributed.
+     * (Rest of function body)
+     */
 
     sibling_index = get_sibling_index(table_id, leaf_pgnum);
     k_prime_index = (sibling_index != -1) ? sibling_index : 0;
@@ -842,10 +944,17 @@ int db_delete(int64_t table_id, int64_t key) {
 
     file_read_page(table_id, sibling_pgnum, &sibling);
     
+    /* Case: sibling has enough free space.
+     * Need to be merged.
+     */
     if (sibling.free_space + leaf.free_space >= FREE_SPACE) {
         merge_leaves(table_id, leaf_pgnum,
                      sibling_pgnum, sibling_index, k_prime);
     }
+
+    /* Case: leaf cannot be merged.
+     * Need to be redistributed.
+     */
     else {
         redistribute_leaves(table_id, leaf_pgnum,
                             sibling_pgnum, sibling_index, k_prime_index);
@@ -853,9 +962,3 @@ int db_delete(int64_t table_id, int64_t key) {
 
     return 0;
 }
-
-/* To do.
- * if insert duplicated key.
- * if delete not existed key.
- * file_free_page() in merge.
- */
