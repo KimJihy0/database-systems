@@ -241,8 +241,8 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
 
 /* Insert new key & child into a page.
  */
-void insert_into_page(int64_t table_id, pagenum_t p_pgnum, int left_index,
-                      int64_t key, pagenum_t right_pgnum) {
+void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
+                      int left_index, int64_t key, pagenum_t right_pgnum) {
     page_t p, right;
     int i;
 
@@ -263,8 +263,8 @@ void insert_into_page(int64_t table_id, pagenum_t p_pgnum, int left_index,
 /* Inserts new key & child into a page so as to exceed
  * the entry order, causing the page to be split in half.
  */
-void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum, int left_index,
-                            int64_t key, pagenum_t right_pgnum) {
+void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
+                            int left_index, int64_t key, pagenum_t right_pgnum) {
     pagenum_t new_pgnum;
     page_t old_page, right, new_page, child;
     int i, j, split, k_prime;
@@ -360,7 +360,7 @@ void insert_into_parent(int64_t table_id,
 
     /* Case: new root. */
     if (parent_pgnum == 0) {
-        insert_adjust_root(table_id, left_pgnum, key, right_pgnum);
+        insert_into_new_root(table_id, left_pgnum, key, right_pgnum);
         return;
     }
 
@@ -388,7 +388,7 @@ void insert_into_parent(int64_t table_id,
 /* Creates a new root for two subtrees
  * and inserts the appropriate key into the new root.
  */
-void insert_adjust_root(int64_t table_id,
+void insert_into_new_root(int64_t table_id,
                           pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum) {
     pagenum_t root_pgnum;
     page_t left, right, root, header;
@@ -417,7 +417,7 @@ void insert_adjust_root(int64_t table_id,
 
 /* Starts a new tree.
  */
-void start_new_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
+void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     pagenum_t root_pgnum;
     page_t root, header;
     
@@ -455,7 +455,7 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
      * Start a new tree.
      */
     if (header.root_num == 0) {
-        start_new_tree(table_id, key, value, val_size);
+        start_tree(table_id, key, value, val_size);
         return 0;
     }
 
@@ -501,7 +501,7 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
     exit(EXIT_FAILURE);
 }
 
-void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, uint64_t key) {
+void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     page_t leaf;
     int i, key_index;
     uint16_t val_size, insertion_offset, deletion_offset;
@@ -536,8 +536,8 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, uint64_t key) {
     file_write_page(table_id, leaf_pgnum, &leaf);
 }
 
-void delete_from_leaf_merge(int64_t table_id, pagenum_t leaf_pgnum,
-                            pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
+void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
+                  pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     page_t leaf, sibling;
     int i, j, leaf_size, sibling_size;
     uint16_t leaf_offset, sibling_offset;
@@ -576,11 +576,11 @@ void delete_from_leaf_merge(int64_t table_id, pagenum_t leaf_pgnum,
     delete_from_child(table_id, leaf.parent, k_prime, leaf_pgnum);
 }
 
-void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
-                             pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
+void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
+                         pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
     page_t leaf, sibling, parent;
-    int i, src_index, dst_index, rotation_size;
-    int16_t offset;
+    int i, src_index, dst_index;
+    int16_t src_size, offset;
 
     file_read_page(table_id, leaf_pgnum, &leaf);
     file_read_page(table_id, sibling_pgnum, &sibling);
@@ -588,8 +588,8 @@ void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
     while (leaf.free_space >= 2500) {
         src_index = (sibling_index != -1) ? sibling.num_keys - 1 : 0;
         dst_index = (sibling_index != -1) ? 0 : leaf.num_keys;
-        rotation_size = sibling.slots[src_index].size;
-        offset = leaf.free_space + SLOT_SIZE * leaf.num_keys - rotation_size;
+        src_size = sibling.slots[src_index].size;
+        offset = leaf.free_space + SLOT_SIZE * leaf.num_keys - src_size;
 
         if (sibling_index != -1) {
             for (i = leaf.num_keys; i > 0; i--) {
@@ -603,10 +603,10 @@ void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
         leaf.slots[dst_index].offset = offset + HEADER_SIZE;
         memmove(leaf.values + offset,
                 sibling.values + sibling.slots[src_index].offset - HEADER_SIZE,
-                rotation_size);
+                src_size);
         
         leaf.num_keys++;
-        leaf.free_space -= (SLOT_SIZE + rotation_size);
+        leaf.free_space -= (SLOT_SIZE + src_size);
 
         delete_from_leaf(table_id, sibling_pgnum, sibling.slots[src_index].key);
         file_read_page(table_id, sibling_pgnum, &sibling);
@@ -622,8 +622,8 @@ void delete_from_leaf_rotate(int64_t table_id, pagenum_t leaf_pgnum,
     file_write_page(table_id, leaf.parent, &parent);
 }
 
-void delete_from_page(int64_t table_id,
-                      pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
+void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
+                      int64_t key, pagenum_t child_pgnum) {
     page_t p;
     int i;
 
@@ -650,10 +650,10 @@ void delete_from_page(int64_t table_id,
     file_write_page(table_id, p_pgnum, &p);
 }
 
-void delete_from_page_merge(int64_t table_id, pagenum_t p_pgnum, pagenum_t sibling_pgnum,
-                            int sibling_index, int k_prime) {
+void merge_pages(int64_t table_id, pagenum_t p_pgnum,
+                 pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     page_t p, sibling, nephew;
-    int i, j, sibling_insertion_index, n_end;
+    int i, j, sibling_insertion_index, p_end;
     
     if (sibling_index != -1) {
         file_read_page(table_id, p_pgnum, &p);
@@ -669,9 +669,9 @@ void delete_from_page_merge(int64_t table_id, pagenum_t p_pgnum, pagenum_t sibli
     sibling.entries[sibling_insertion_index].key = k_prime;
     sibling.num_keys++;
 
-    n_end = p.num_keys;
+    p_end = p.num_keys;
     // 약간의 조정했음. 문제시 수정
-    for (i = sibling_insertion_index + 1, j = 0; j < n_end; i++, j++) {
+    for (i = sibling_insertion_index + 1, j = 0; j < p_end; i++, j++) {
         sibling.entries[i].key = p.entries[j].key;
         sibling.entries[i].child = p.entries[j].child;
         sibling.num_keys++;
@@ -694,9 +694,9 @@ void delete_from_page_merge(int64_t table_id, pagenum_t p_pgnum, pagenum_t sibli
     delete_from_page(table_id, p.parent, k_prime, p_pgnum);
 }
 
-void delete_from_page_rotate(int64_t table_id, pagenum_t p_pgnum, pagenum_t sibling_pgnum,
-                             int sibling_index, int k_prime_index, int k_prime) {
-    pagenum_t temp_pgnum;
+void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
+                        pagenum_t sibling_pgnum, int sibling_index,
+                        int k_prime_index, int64_t k_prime) {
     page_t p, sibling, parent, temp;
     int i;
 
@@ -748,10 +748,9 @@ void delete_from_page_rotate(int64_t table_id, pagenum_t p_pgnum, pagenum_t sibl
 void delete_from_child(int64_t table_id,
                        pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
     pagenum_t sibling_pgnum;
-    page_t p, child, sibling, parent;
-    int min_keys, sibling_index;
-    int k_prime_index, k_prime;
-    int capacity;
+    page_t p, sibling, parent;
+    int sibling_index, k_prime_index;
+    int64_t k_prime;
 
     delete_from_page(table_id, p_pgnum, key, child_pgnum);
 
@@ -759,14 +758,17 @@ void delete_from_child(int64_t table_id,
     file_read_page(table_id, p.parent, &parent);
 
     if (p.parent == 0) {
-        delete_adjust_root(table_id, p_pgnum);
+        if (p.num_keys > 0) return;
+        adjust_root(table_id, p_pgnum);
         return;
     }
 
-    if (p.num_keys >= ENTRY_ORDER / 2) return;
+    if (p.num_keys >= ENTRY_ORDER / 2) {
+        return;
+    }
 
     sibling_index = get_sibling_index(table_id, p_pgnum);
-    k_prime_index = (sibling_index == -1) ? 0 : sibling_index;
+    k_prime_index = (sibling_index != -1) ? sibling_index : 0;
     k_prime = parent.entries[k_prime_index].key;
     if (sibling_index == 0) sibling_pgnum = parent.left_child;
     else if (sibling_index == -1) sibling_pgnum = parent.entries[0].child;
@@ -775,51 +777,55 @@ void delete_from_child(int64_t table_id,
     file_read_page(table_id, sibling_pgnum, &sibling);
     
     if (sibling.num_keys + p.num_keys < ENTRY_ORDER - 1) {
-        delete_from_page_merge(table_id, p_pgnum, sibling_pgnum, sibling_index, k_prime);
+        merge_pages(table_id, p_pgnum, sibling_pgnum, sibling_index, k_prime);
     }
     else {
-        delete_from_page_rotate(table_id, p_pgnum, sibling_pgnum, sibling_index, k_prime_index, k_prime);
+        redistribute_pages(table_id, p_pgnum,
+                           sibling_pgnum, sibling_index, k_prime_index, k_prime);
     }
 }
 
-void delete_adjust_root(int64_t table_id, pagenum_t root_pgnum) {
+void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
     page_t root, new_root, header;
 
     file_read_page(table_id, 0, &header);
     file_read_page(table_id, root_pgnum, &root);
+    file_read_page(table_id, root.left_child, &new_root);
 
-    if (root.num_keys > 0) return;
-
-    if (!root.is_leaf) {
-        header.root_num = root.left_child;
-
-        file_read_page(table_id, root.left_child, &new_root);
-        new_root.parent = 0;
-        file_write_page(table_id, root.left_child, &new_root);
-    }
-    else {
-        header.root_num = 0;
-    }
+    header.root_num = root.left_child;
+    new_root.parent = 0;
 
     file_write_page(table_id, 0, &header);
-    file_write_page(table_id, root_pgnum, &root); //지워도 되는거 아닌가
+    file_free_page(table_id, root_pgnum);
+    file_write_page(table_id, root.left_child, &new_root);
+}
+
+void destroy_tree(int64_t table_id, pagenum_t root_pgnum) {
+    page_t header;
+
+    file_read_page(table_id, 0, &header);
+
+    header.root_num = 0;
+
+    file_write_page(table_id, 0, &header);
+    file_free_page(table_id, root_pgnum);
 }
 
 int db_delete(int64_t table_id, int64_t key) {
     pagenum_t leaf_pgnum, sibling_pgnum;
     page_t leaf, sibling, parent;
-    int i, sibling_index, k_prime_index, val_size;
+    int sibling_index, k_prime_index;
     int64_t k_prime;
 
     leaf_pgnum = find_leaf(table_id, key);
-   
     delete_from_leaf(table_id, leaf_pgnum, key);
 
     file_read_page(table_id, leaf_pgnum, &leaf);
     file_read_page(table_id, leaf.parent, &parent);
 
     if (leaf.parent == 0) {
-        delete_adjust_root(table_id, leaf_pgnum);
+        if (leaf.num_keys > 0) return 0;
+        destroy_tree(table_id, leaf_pgnum);
         return 0;
     }
 
@@ -828,43 +834,28 @@ int db_delete(int64_t table_id, int64_t key) {
     }
 
     sibling_index = get_sibling_index(table_id, leaf_pgnum);
-    k_prime_index = (sibling_index == -1) ? 0 : sibling_index;
+    k_prime_index = (sibling_index != -1) ? sibling_index : 0;
     k_prime = parent.entries[k_prime_index].key;
-    if (sibling_index == 0) sibling_pgnum = parent.left_child;
-    else if (sibling_index == -1) sibling_pgnum = parent.entries[0].child;
+    if (sibling_index == -1) sibling_pgnum = parent.entries[0].child;
+    else if (sibling_index == 0) sibling_pgnum = parent.left_child;
     else sibling_pgnum = parent.entries[sibling_index - 1].child;
 
     file_read_page(table_id, sibling_pgnum, &sibling);
     
     if (sibling.free_space + leaf.free_space >= FREE_SPACE) {
-        delete_from_leaf_merge(table_id, leaf_pgnum,
-                               sibling_pgnum, sibling_index, k_prime);
+        merge_leaves(table_id, leaf_pgnum,
+                     sibling_pgnum, sibling_index, k_prime);
     }
     else {
-        delete_from_leaf_rotate(table_id, leaf_pgnum,
-                                sibling_pgnum, sibling_index, k_prime_index);
+        redistribute_leaves(table_id, leaf_pgnum,
+                            sibling_pgnum, sibling_index, k_prime_index);
     }
 
     return 0;
 }
 
-
-void insert_into_leaf();
-void insert_into_leaf_split();
-void insert_into_page();
-void insert_into_page_split();
-void insert_into_parent();
-void insert_adjust_root();
-void start_tree();
-void db_insert();
-
-void remove_from_leaf();
-void remove_from_leaf_merge();
-void remove_from_leaf_rotate();
-void remove_from_page();
-void remove_from_page_merge();
-void remove_from_page_rotate();
-void remove_from_chlid();
-void remove_adjust_root();
-void destroy_tree();
-void db_delete();
+/* To do.
+ * if insert duplicated key.
+ * if delete not existed key.
+ * file_free_page() in merge.
+ */
