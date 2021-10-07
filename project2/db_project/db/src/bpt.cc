@@ -1,5 +1,5 @@
-#include "../include/bpt.h"
-#include "../include/file.h"
+#include "bpt.h"
+#include "file.h"
 
 /* Opens existing data file using pathname,
  * or creates one if not existed.
