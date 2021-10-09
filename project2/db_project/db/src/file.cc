@@ -1,21 +1,21 @@
 #include "../include/file.h"
 
-file* files;
+file_t* files;
 
-// Open existing database file or create one if not existed
-int file_open_database_file(const char* pathname) {
+// Open existing table file or create one if not existed
+int64_t file_open_table_file(const char* pathname) {
 	int fd;
 	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL);
 	// file exists
 	if (fd < 0 && errno == EEXIST) {
 		fd = open(pathname, O_RDWR);
 		if (fd < 0) {
-			perror("Failure to open database file");
+			perror("Failure to open table file");
 			exit(1);
 		}
 	}
 	else if (fd < 0) {
-		perror("Failure to open database file");
+		perror("Failure to open table file");
 		exit(1);
 	}
 	// file not exists
@@ -44,8 +44,8 @@ int file_open_database_file(const char* pathname) {
 	}
 
 	// insert file descriptor into linked-list
-	file* new_file;
-	new_file = (file*)malloc(sizeof(file));
+	file_t* new_file;
+	new_file = (file_t*)malloc(sizeof(file_t));
 	if (new_file == NULL) {
 		perror("New file node creation");
 		exit(1);
@@ -71,7 +71,7 @@ pagenum_t file_alloc_page(int fd) {
 	if (header.free_num == 0) {
 		num = header.num_pages;
 		if (num == UINT64_MAX) {
-			perror("Failure to allocate page(Too many allocated pages)");
+			perror("Failure to allocate page(too many allocated pages)");
 			exit(1);
 		}
 
@@ -116,6 +116,14 @@ pagenum_t file_alloc_page(int fd) {
 	header.free_num = tmp.next_frpg;
 	lseek(fd, 0, SEEK_SET);
 	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+		perror("Failure to write");
+		exit(1);
+	}
+	sync();
+
+	memset(&tmp, 0, PAGE_SIZE);
+	lseek(fd, num * PAGE_SIZE, SEEK_SET);
+	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to write");
 		exit(1);
 	}
@@ -170,9 +178,9 @@ void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
 	sync();
 }
 
-// Stop referencing the database file
-void file_close_database_file() {
-	file* tfile;
+// Close all table files
+void file_close_table_file() {
+	file_t* tfile;
 	for (tfile = files; tfile; tfile = tfile->next) {
 		close(tfile->fd);
 	}
