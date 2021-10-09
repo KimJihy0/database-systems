@@ -10,12 +10,12 @@ int64_t file_open_table_file(const char* pathname) {
 	if (fd < 0 && errno == EEXIST) {
 		fd = open(pathname, O_RDWR);
 		if (fd < 0) {
-			perror("Failure to open table file");
+			perror("Failure to open table file(open error)");
 			exit(1);
 		}
 	}
 	else if (fd < 0) {
-		perror("Failure to open table file");
+		perror("Failure to open table file(open error)");
 		exit(1);
 	}
 	// file not exists
@@ -26,7 +26,7 @@ int64_t file_open_table_file(const char* pathname) {
 		header.root_num = 0;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-			perror("Failure to write");
+			perror("Failure to open table file(write error)");
 			exit(1);
 		}
 		sync();
@@ -36,7 +36,7 @@ int64_t file_open_table_file(const char* pathname) {
 		for (i = 1; i < INITIAL_PAGENUM; i++) {
 			freepg.next_frpg = i - 1;
 			if (write(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
-				perror("Failure to write");
+				perror("Failure to open table file(write error)");
 				exit(1);
 			}
 			sync();
@@ -62,7 +62,7 @@ pagenum_t file_alloc_page(int fd) {
 	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to read");
+		perror("Failure to alloc page(read error)");
 		exit(1);
 	}
 
@@ -71,7 +71,7 @@ pagenum_t file_alloc_page(int fd) {
 	if (header.free_num == 0) {
 		num = header.num_pages;
 		if (num == UINT64_MAX) {
-			perror("Failure to allocate page(too many allocated pages)");
+			perror("Failure to alloc page(too many pages)");
 			exit(1);
 		}
 
@@ -79,7 +79,7 @@ pagenum_t file_alloc_page(int fd) {
 		tmp_page.next_frpg = 0;
 		lseek(fd, num * PAGE_SIZE, SEEK_SET);
 		if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
-			perror("Failure to write");
+			perror("Failure to alloc page(write error)");
 			exit(1);
 		}
 		sync();
@@ -88,7 +88,7 @@ pagenum_t file_alloc_page(int fd) {
 		for(tmp_num = num + 1; tmp_num < 2 * num && tmp_num < UINT64_MAX; tmp_num++) {
 			tmp_page.next_frpg = tmp_num - 1;
 			if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
-				perror("Failure to write");
+				perror("Failure to alloc page(write error)");
 				exit(1);
 			}
 			sync();
@@ -98,7 +98,7 @@ pagenum_t file_alloc_page(int fd) {
 		header.num_pages = tmp_num;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-			perror("Failure to write");
+			perror("Failure to alloc page(write error)");
 			exit(1);
 		}
 		sync();
@@ -109,14 +109,14 @@ pagenum_t file_alloc_page(int fd) {
 	freepg_t freepg;
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
 	if (read(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to read");
+		perror("Failure to alloc page(read error)");
 		exit(1);
 	}
 	
 	header.free_num = freepg.next_frpg;
 	lseek(fd, 0, SEEK_SET);
 	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to write");
+		perror("Failure to alloc page(write error)");
 		exit(1);
 	}
 	sync();
@@ -124,7 +124,7 @@ pagenum_t file_alloc_page(int fd) {
 	memset(&freepg, 0x00, PAGE_SIZE);
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
 	if (write(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to write");
+		perror("Failure to alloc page(write error)");
 		exit(1);
 	}
 	sync();
@@ -137,7 +137,7 @@ void file_free_page(int fd, pagenum_t pagenum) {
 	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to read");
+		perror("Failure to free page(read error)");
 		exit(1);
 	}
 
@@ -145,7 +145,7 @@ void file_free_page(int fd, pagenum_t pagenum) {
 	tmp.next_frpg = header.free_num;
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to write");
+		perror("Failure to free page(write error)");
 		exit(1);
 	}
 	sync();
@@ -153,7 +153,7 @@ void file_free_page(int fd, pagenum_t pagenum) {
 	header.free_num = pagenum;
 	lseek(fd, 0, SEEK_SET);
 	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to write");
+		perror("Failure to free page(write error)");
 		exit(1);
 	}
 	sync();
@@ -163,7 +163,7 @@ void file_free_page(int fd, pagenum_t pagenum) {
 void file_read_page(int fd, pagenum_t pagenum, page_t* dest) {
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (read(fd, dest, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to read");
+		perror("Failure to read page(read error)");
 		exit(1);
 	}
 }
@@ -172,7 +172,7 @@ void file_read_page(int fd, pagenum_t pagenum, page_t* dest) {
 void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, src, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to write");
+		perror("Failure to write page(write error)");
 		exit(1);
 	}
 	sync();

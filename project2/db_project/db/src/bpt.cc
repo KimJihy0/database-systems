@@ -17,7 +17,6 @@ int64_t open_table(char* pathname) {
  * If successes, returns 0. Otherwise, returns -1. 
  */
 int init_db() {
-    open_table((char*)"JihyoSQL.db");
     return 0;
 }
 
@@ -976,12 +975,13 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
 /* ---To do---
  * table_id & fd
  * open_table() error control.
+ * cmake
+ * total # of file <= 20 : error?
+ * 
+ * ---Done---
  * wiki? (modification)
  * wiki -> design rational.
  * pread & pwrite?
- * 
- * 
- * ---Done---
  * rerun without removing file.
  * insert val_size?
  * check value.
