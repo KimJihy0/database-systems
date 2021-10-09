@@ -10,15 +10,15 @@
 #include <errno.h>
 #include <string.h>
 
-#define PAGE_SIZE 0x1000 								// 4KiB
-#define INITIAL_FILESIZE (10 * 0x100000) 				// 10MiB
+#define PAGE_SIZE (4 * 1024)							// 4KiB
+#define INITIAL_FILESIZE (10 * 1024 * 1024)				// 10MiB
 #define INITIAL_PAGENUM (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
 
-int file_open_database_file(const char* pathname);
+int64_t file_open_table_file(const char* pathname);
 pagenum_t file_alloc_page(int fd);
 void file_free_page(int fd, pagenum_t pagenum);
 void file_read_page(int fd, pagenum_t pagenum, page_t* dest);
 void file_write_page(int fd, pagenum_t pagenum, const page_t* src);
-void file_close_database_file();
+void file_close_table_file();
 
 #endif	// DB_FILE_H_

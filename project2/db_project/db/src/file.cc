@@ -20,7 +20,7 @@ int64_t file_open_table_file(const char* pathname) {
 	}
 	// file not exists
 	else {
-		page_t header;
+		header_t header;
 		header.free_num = INITIAL_PAGENUM - 1;
 		header.num_pages = INITIAL_PAGENUM;
 		header.root_num = 0;
@@ -31,11 +31,11 @@ int64_t file_open_table_file(const char* pathname) {
 		}
 		sync();
 
-		page_t tmp;
+		freepg_t freepg;
 		int i;
 		for (i = 1; i < INITIAL_PAGENUM; i++) {
-			tmp.next_frpg = i - 1;
-			if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
+			freepg.next_frpg = i - 1;
+			if (write(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
 				perror("Failure to write");
 				exit(1);
 			}
@@ -59,7 +59,7 @@ int64_t file_open_table_file(const char* pathname) {
 
 // Allocate an on-disk page from the free page list
 pagenum_t file_alloc_page(int fd) {
-	page_t header;
+	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
@@ -75,27 +75,27 @@ pagenum_t file_alloc_page(int fd) {
 			exit(1);
 		}
 
-		page_t tmppage;
-		tmppage.next_frpg = 0;
+		freepg_t tmp_page;
+		tmp_page.next_frpg = 0;
 		lseek(fd, num * PAGE_SIZE, SEEK_SET);
-		if (write(fd, &tmppage, PAGE_SIZE) < PAGE_SIZE) {
+		if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
 			perror("Failure to write");
 			exit(1);
 		}
 		sync();
 
-		pagenum_t tmpnum;
-		for(tmpnum = num + 1; tmpnum < 2 * num && tmpnum < UINT64_MAX; tmpnum++) {
-			tmppage.next_frpg = tmpnum - 1;
-			if (write(fd, &tmppage, PAGE_SIZE) < PAGE_SIZE) {
+		pagenum_t tmp_num;
+		for(tmp_num = num + 1; tmp_num < 2 * num && tmp_num < UINT64_MAX; tmp_num++) {
+			tmp_page.next_frpg = tmp_num - 1;
+			if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
 				perror("Failure to write");
 				exit(1);
 			}
 			sync();
 		}
 
-		header.free_num = tmpnum - 1;
-		header.num_pages = tmpnum;
+		header.free_num = tmp_num - 1;
+		header.num_pages = tmp_num;
 		lseek(fd, 0, SEEK_SET);
 		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 			perror("Failure to write");
@@ -106,14 +106,14 @@ pagenum_t file_alloc_page(int fd) {
 	// allocate page
 	num = header.free_num;
 
-	page_t tmp;
+	freepg_t freepg;
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
-	if (read(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
+	if (read(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
 		exit(1);
 	}
 	
-	header.free_num = tmp.next_frpg;
+	header.free_num = freepg.next_frpg;
 	lseek(fd, 0, SEEK_SET);
 	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to write");
@@ -121,9 +121,9 @@ pagenum_t file_alloc_page(int fd) {
 	}
 	sync();
 
-	memset(&tmp, 0, PAGE_SIZE);
+	memset(&freepg, 0x00, PAGE_SIZE);
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
-	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
+	if (write(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to write");
 		exit(1);
 	}
@@ -134,14 +134,14 @@ pagenum_t file_alloc_page(int fd) {
 
 // Free an on-disk page to the free page list
 void file_free_page(int fd, pagenum_t pagenum) {
-	page_t header;
+	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read");
 		exit(1);
 	}
 
-	page_t tmp;
+	freepg_t tmp;
 	tmp.next_frpg = header.free_num;
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {

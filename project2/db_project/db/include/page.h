@@ -5,39 +5,26 @@
 
 typedef uint64_t pagenum_t;
 
-#pragma pack (push, 1)
-struct slot_t {
-    uint64_t key;
+struct __attribute__((packed)) slot_t {
+    int64_t key;
     uint16_t size;
     uint16_t offset;
 };
-#pragma pack (pop)
 
 struct entry_t {
-    uint64_t key;
+    int64_t key;
     uint64_t child;
 };
 
 struct page_t {
-    union {
-        uint64_t free_num;
-        uint64_t parent;
-        uint64_t next_frpg;
+    uint64_t parent;
+    struct {
+        uint32_t is_leaf;
+        uint32_t num_keys;
     };
-    union {
-        uint64_t num_pages;
-        struct {
-            uint32_t is_leaf;
-            uint32_t num_keys;
-        };
-    };
-    union {
-        uint64_t root_num;
-    };
+    uint64_t root_num;
     char reserved[88];
-    union {
-        uint64_t free_space;
-    };
+    uint64_t free_space;
     union { 
         uint64_t sibling;
         uint64_t left_child;
@@ -51,9 +38,21 @@ struct page_t {
     };
 };
 
-struct file {
-	int fd;
-	file* next;
+struct header_t {
+    uint64_t free_num;
+    uint64_t num_pages;
+    uint64_t root_num;
+    char reserved[4072];
 };
 
-#endif
+struct freepg_t {
+    uint64_t next_frpg;
+    char reserved[4088];
+};
+
+struct file_t {
+	int fd;
+	file_t* next;
+};
+
+#endif  //DB_PAGE_H_
