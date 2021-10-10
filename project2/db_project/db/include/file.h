@@ -15,10 +15,10 @@
 #define INITIAL_PAGENUM (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
 
 int64_t file_open_table_file(const char* pathname);
-pagenum_t file_alloc_page(int fd);
-void file_free_page(int fd, pagenum_t pagenum);
-void file_read_page(int fd, pagenum_t pagenum, page_t* dest);
-void file_write_page(int fd, pagenum_t pagenum, const page_t* src);
+pagenum_t file_alloc_page(int64_t table_id);
+void file_free_page(int64_t table_id, pagenum_t pagenum);
+void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest);
+void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src);
 void file_close_table_file();
 
 #endif	// DB_FILE_H_

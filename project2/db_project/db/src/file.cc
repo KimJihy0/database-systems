@@ -1,6 +1,7 @@
-#include "../include/file.h"
+#include "file.h"
+#include "hash.h"
 
-file_t* files;
+table_t tables[NUM_TABLES];
 
 // Open existing table file or create one if not existed
 int64_t file_open_table_file(const char* pathname) {
@@ -42,23 +43,19 @@ int64_t file_open_table_file(const char* pathname) {
 			sync();
 		}
 	}
+	// insert file descriptor into hash table
+	table_t new_table;
+	strcpy(new_table.pathname, pathname);
+	new_table.fd = fd;	
 
-	// insert file descriptor into linked-list
-	file_t* new_file;
-	new_file = (file_t*)malloc(sizeof(file_t));
-	if (new_file == NULL) {
-		perror("New file node creation");
-		exit(1);
-	}
-	new_file->fd = fd;
-	new_file->next = files;
-	files = new_file;
-
-	return fd;
+	return add_hash_table(new_table, tables);
 }
 
 // Allocate an on-disk page from the free page list
-pagenum_t file_alloc_page(int fd) {
+pagenum_t file_alloc_page(int64_t table_id) {
+	int fd;
+	fd = tables[table_id].fd;
+
 	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
@@ -133,7 +130,10 @@ pagenum_t file_alloc_page(int fd) {
 }
 
 // Free an on-disk page to the free page list
-void file_free_page(int fd, pagenum_t pagenum) {
+void file_free_page(int64_t table_id, pagenum_t pagenum) {
+	int fd;
+	fd = tables[table_id].fd;
+
 	header_t header;
 	lseek(fd, 0, SEEK_SET);
 	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
@@ -160,7 +160,10 @@ void file_free_page(int fd, pagenum_t pagenum) {
 }
 
 // Read an on-disk page into the in-memory page structure(dest)
-void file_read_page(int fd, pagenum_t pagenum, page_t* dest) {
+void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest) {
+	int fd;
+	fd = tables[table_id].fd;
+
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (read(fd, dest, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to read page(read error)");
@@ -169,7 +172,10 @@ void file_read_page(int fd, pagenum_t pagenum, page_t* dest) {
 }
 
 // Write an in-memory page(src) to the on-disk page
-void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
+void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src) {
+	int fd;
+	fd = tables[table_id].fd;
+
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, src, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to write page(write error)");
@@ -180,8 +186,9 @@ void file_write_page(int fd, pagenum_t pagenum, const page_t* src) {
 
 // Close all table files
 void file_close_table_file() {
-	file_t* tfile;
-	for (tfile = files; tfile; tfile = tfile->next) {
-		close(tfile->fd);
+	int i;
+	for (i = 0; i < NUM_TABLES; i++) {
+		if (!EMPTY(tables[i]))
+			close(tables[i].fd);
 	}
 }

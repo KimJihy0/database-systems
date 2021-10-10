@@ -1,5 +1,11 @@
-#include "db/src/bpt.cc"
-#include "db/src/file.cc"
+// #include "db/src/bpt.cc"
+// #include "db/src/file.cc"
+// #include "db/src/hash.cc"
+
+#include "db/include/bpt.h"
+#include "db/include/file.h"
+#include "db/include/hash.h"
+
 #include <stdlib.h>
 
 #include <deque>
@@ -24,6 +30,26 @@ int size(int key) {
 }
 
 #if 1
+int main() {
+	int64_t table0 = file_open_table_file((char*)"table0");
+	int64_t table1 = file_open_table_file((char*)"table1");
+	int64_t table2 = file_open_table_file((char*)"tacke1");
+
+	for (int i = 0; i < 500; i++) {
+		db_insert(table1, i, val(i), size(i));
+	}
+
+	print_all(table1);
+	print_all(table2);
+
+	shutdown_db();
+	remove("table0");
+	remove("table1");
+	remove("tacke2");
+}
+#endif
+
+#if 0
 int main() {
 	int64_t table_id = file_open_table_file((char*)"deletion.db");
 

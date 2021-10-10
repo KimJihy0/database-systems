@@ -1,5 +1,6 @@
-#include "../include/bpt.h"
-#include "../include/file.h"
+#include "bpt.h"
+#include "file.h"
+#include "hash.h"
 
 // DBMS
 
@@ -9,7 +10,9 @@
  * Otherwise, returns -1.
  */
 int64_t open_table(char* pathname) {
-    int64_t table_id = file_open_table_file(pathname);
+    int64_t table_id;
+    table_id = file_open_table_file(pathname);
+    if (table_id < 0) return -1;
     return table_id;
 }
 
@@ -17,6 +20,11 @@ int64_t open_table(char* pathname) {
  * If successes, returns 0. Otherwise, returns -1. 
  */
 int init_db() {
+    extern table_t tables[];
+    int i;
+    for (i = 0; i < NUM_TABLES; i++) {
+        tables[i].pathname[0] = 0;
+    }
     return 0;
 }
 
@@ -973,12 +981,12 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
 }
 
 /* ---To do---
- * table_id & fd
- * open_table() error control.
- * cmake
- * total # of file <= 20 : error?
+ * total # of file <= 20 : error? or just for load factor? ->add_hash_table return 2 add or remove.
+ * constant variable: NUM_TABLES
  * 
  * ---Done---
+ * cmake
+ * hash
  * wiki? (modification)
  * wiki -> design rational.
  * pread & pwrite?

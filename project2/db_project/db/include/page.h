@@ -50,9 +50,4 @@ struct freepg_t {
     char reserved[4088];
 };
 
-struct file_t {
-	int fd;
-	file_t* next;
-};
-
 #endif  //DB_PAGE_H_
