@@ -1,12 +1,5 @@
-// #include "db/src/bpt.cc"
-// #include "db/src/file.cc"
-// #include "db/src/hash.cc"
-
-#include "db/include/bpt.h"
-#include "db/include/file.h"
-#include "db/include/hash.h"
-
-#include <stdlib.h>
+#include "bpt.h"
+#include "dbms.h"
 
 #include <deque>
 using namespace std;
@@ -16,36 +9,56 @@ void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
 
-char* val(int key) {
-	static char value[3];
-	sprintf(value, "%02d", key % 100);
-	return value;
-}
-
-int size() {
-	return rand() % 63 + 50;
-}
-int size(int key) {
-	return key % 63 + 50;
-}
+char* val(int key);
+int size();
+int size(int key);
 
 #if 1
-int main() {
-	int64_t table0 = file_open_table_file((char*)"table0");
-	int64_t table1 = file_open_table_file((char*)"table1");
-	int64_t table2 = file_open_table_file((char*)"tacke1");
+int main(int argc, char** argv) {
+	init_db();
 
-	for (int i = 0; i < 500; i++) {
-		db_insert(table1, i, val(i), size(i));
+	int64_t table_ids[20];
+	table_ids[0] = open_table((char*)"zzzzzz");
+	table_ids[1] = open_table((char*)"tawdv1");
+	table_ids[2] = open_table((char*)"tacke1");
+	table_ids[3] = open_table((char*)"tad1");
+	table_ids[4] = open_table((char*)"tawdve1");
+	table_ids[5] = open_table((char*)"tab1");
+	table_ids[6] = open_table((char*)"ta253e1");
+	table_ids[7] = open_table((char*)"ta151235e1");
+	table_ids[8] = open_table((char*)"t25e1");
+	table_ids[9] = open_table((char*)"tack626261231");
+	table_ids[10] = open_table((char*)"tac2513521");
+	table_ids[11] = open_table((char*)"tac2513521");
+	table_ids[12] = open_table((char*)"tac21351");
+	table_ids[13] = open_table((char*)"12352531");
+	table_ids[14] = open_table((char*)"t1235ke1");
+	table_ids[15] = open_table((char*)"tac2351325gdfsfdg1");
+	table_ids[16] = open_table((char*)"tac253");
+	table_ids[17] = open_table((char*)"ta234324234ke1");
+	table_ids[18] = open_table((char*)"zzzzzz");
+	table_ids[19] = open_table((char*)"zzzzzz");
+
+	// for (int i = 0; i < 10; i++) {
+	// 	db_insert(table_ids[0], i, val(i), size(i));
+	// }
+	db_insert(table_ids[0], 100, val(5), size(5));
+
+	db_insert(table_ids[1], 1, val(1), size(1));
+
+	print_all(table_ids[0]);
+	print_all(table_ids[1]);
+	print_all(table_ids[2]);
+
+	for (int i = 0; i < 20; i++) {
+		printf("table%2d: %ld\n", i, table_ids[i]);
 	}
 
-	print_all(table1);
-	print_all(table2);
+	for (int i = 0; i < NUM_TABLES; i++) {
+		printf("[%2d] pathname: %-20s, fd: %d\n", i, tables[i].pathname, tables[i].fd);
+	}
 
 	shutdown_db();
-	remove("table0");
-	remove("table1");
-	remove("tacke2");
 }
 #endif
 
@@ -177,7 +190,7 @@ void print_leaves(int64_t table_id) {
     pagenum_t temp_pgnum;
     page_t header, temp;
     file_read_page(table_id, 0, &header);
-    temp_pgnum = header.root_num;
+    temp_pgnum = get_root_num(table_id);
     file_read_page(table_id, temp_pgnum, &temp);
     if (temp_pgnum == 0) {
         printf("Empty tree.\n");
@@ -207,7 +220,7 @@ void print_page(pagenum_t page_num, page_t page) {
         printf("-----header information-----\n");
         // printf("free_num: %ld\n", page.free_num);
         // printf("num_pages: %ld\n", page.num_pages);
-        printf("root_num: %ld\n", page.root_num);
+        // printf("root_num: %ld\n", page.root_num);
         printf("\n");
         return;
     }
@@ -258,7 +271,7 @@ void print_all(int64_t table_id) {
     file_read_page(table_id, 0, &header);
     print_page(0, header);
 
-    root_num = header.root_num;
+    root_num = get_root_num(table_id);
     file_read_page(table_id, root_num, &root);
     print_page(root_num, root);
     if (root.is_leaf) return;
@@ -270,4 +283,17 @@ void print_all(int64_t table_id) {
         file_read_page(table_id, temp_num, &page);
         print_page(temp_num, page);
     }
+}
+
+char* val(int key) {
+	static char value[3];
+	sprintf(value, "%02d", key % 100);
+	return value;
+}
+
+int size() {
+	return rand() % 63 + 50;
+}
+int size(int key) {
+	return key % 63 + 50;
 }

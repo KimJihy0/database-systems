@@ -22,8 +22,7 @@ struct page_t {
         uint32_t is_leaf;
         uint32_t num_keys;
     };
-    uint64_t root_num;
-    char reserved[88];
+    char reserved[96];
     uint64_t free_space;
     union { 
         uint64_t sibling;

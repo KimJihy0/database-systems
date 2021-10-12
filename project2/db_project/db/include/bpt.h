@@ -1,6 +1,7 @@
 #ifndef DB_BPT_H_
 #define DB_BPT_H_
 
+#include "file.h"
 #include <stdint.h>
 
 #define HEADER_SIZE 128
@@ -8,13 +9,7 @@
 #define SLOT_SIZE 12
 #define ENTRY_ORDER 249
 
-typedef uint64_t pagenum_t;
-
-// DBMS
-
 int64_t open_table(char* pathname);
-int init_db();
-int shutdown_db();
 
 // SEARCH
 
@@ -41,7 +36,7 @@ pagenum_t make_leaf(int64_t table_id);
 pagenum_t make_page(int64_t table_id);
 int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnum);
 
-//DELETION
+// DELETION
 
 int db_delete(int64_t table_id, int64_t key);
 void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key);
