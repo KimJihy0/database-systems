@@ -13,6 +13,5 @@ int init_db() {
  */
 int shutdown_db() {
     file_close_table_file();
-    memset(tables, 0x00, NUM_TABLES * sizeof(table_t));
     return 0;
 }

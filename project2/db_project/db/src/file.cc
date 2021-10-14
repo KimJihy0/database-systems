@@ -5,10 +5,10 @@ table_t tables[NUM_TABLES];
 // Open existing table file or create one if not existed
 int64_t file_open_table_file(const char* pathname) {
 	int fd;
-	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0644);
+	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0777);
 	// file exists
 	if (fd < 0 && errno == EEXIST) {
-		fd = open(pathname, O_RDWR|O_SYNC, 0644);
+		fd = open(pathname, O_RDWR|O_SYNC, 0777);
 		if (fd < 0) {
 			perror("Failure to open table file(open error)");
 			exit(EXIT_FAILURE);
@@ -31,7 +31,7 @@ int64_t file_open_table_file(const char* pathname) {
 		}
 		fsync(fd);
 
-		freepg_t freepg;
+		page_t freepg;
 		int i;
 		for (i = 1; i < INITIAL_PAGENUM; i++) {
 			freepg.next_frpg = i - 1;
@@ -46,11 +46,7 @@ int64_t file_open_table_file(const char* pathname) {
 	table_t new_table;
 	strcpy(new_table.pathname, pathname);
 	new_table.fd = fd;
-	
-	int64_t table_id;
-	table_id = add_table(new_table, tables);
-	if (table_id == -1) close(fd);
-	return table_id;
+	return add_table(new_table, tables);
 }
 
 // Allocate an on-disk page from the free page list
@@ -70,7 +66,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 	if (header.free_num == 0) {
 		num = header.num_pages;
 
-		freepg_t tmp_page;
+		page_t tmp_page;
 		tmp_page.next_frpg = 0;
 		lseek(fd, num * PAGE_SIZE, SEEK_SET);
 		if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
@@ -80,7 +76,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 		fsync(fd);
 
 		pagenum_t tmp_num;
-		for(tmp_num = num + 1; tmp_num < 2 * num && tmp_num < UINT64_MAX; tmp_num++) {
+		for(tmp_num = num + 1; tmp_num < 2 * num; tmp_num++) {
 			tmp_page.next_frpg = tmp_num - 1;
 			if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
 				perror("Failure to alloc page(write error)");
@@ -95,7 +91,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 	// allocate page
 	num = header.free_num;
 
-	freepg_t freepg;
+	page_t freepg;
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
 	if (read(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
 		perror("Failure to alloc page(read error)");
@@ -125,7 +121,7 @@ void file_free_page(int64_t table_id, pagenum_t pagenum) {
 		exit(EXIT_FAILURE);
 	}
 
-	freepg_t tmp;
+	page_t tmp;
 	tmp.next_frpg = header.free_num;
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
 	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {

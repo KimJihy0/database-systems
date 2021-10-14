@@ -17,7 +17,10 @@ struct entry_t {
 };
 
 struct page_t {
-    uint64_t parent;
+    union {
+        uint64_t next_frpg;
+        uint64_t parent;
+    };
     struct {
         uint32_t is_leaf;
         uint32_t num_keys;
@@ -42,11 +45,6 @@ struct header_t {
     uint64_t num_pages;
     uint64_t root_num;
     char reserved[4072];
-};
-
-struct freepg_t {
-    uint64_t next_frpg;
-    char reserved[4088];
 };
 
 #endif  //DB_PAGE_H_
