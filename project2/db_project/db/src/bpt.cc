@@ -6,7 +6,13 @@
  * Otherwise, returns -1.
  */
 int64_t open_table(char* pathname) {
-    return file_open_table_file(pathname);
+    int64_t table_id;
+    table_id = file_open_table_file(pathname);
+    if (table_id < 0) {
+        close(tables[table_id % NUM_TABLES].fd);
+        return -1;
+    }
+    return table_id;
 }
 
 // SEARCH
@@ -66,11 +72,6 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
 int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     pagenum_t leaf_pgnum;
     page_t leaf;
-
-    if (val_size < 50 || val_size > 112) {
-        printf("size of value should be between 50 and 112.\n");
-        return -1;
-    }
 
     /* Ignore duplicates.
      */
@@ -150,9 +151,9 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     page_t leaf, new_leaf;
     slot_t temp_slots[65];
     char temp_values[3968];
-    int insertion_index, split, new_key, i, j;
+    int64_t new_key;
+    int insertion_index, split, i, j, num_keys, total_size;
     uint16_t offset;
-    int total_size, num_keys;
     
     file_read_page(table_id, leaf_pgnum, &leaf);
     
@@ -313,7 +314,8 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
                             int left_index, int64_t key, pagenum_t right_pgnum) {
     pagenum_t new_pgnum;
     page_t old_page, right, new_page, child;
-    int i, j, split, k_prime;
+    int64_t k_prime;
+    int i, j, split;
     pagenum_t left_child;
     entry_t temp[ENTRY_ORDER];
     
@@ -706,8 +708,8 @@ void delete_from_child(int64_t table_id,
                        pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
     pagenum_t sibling_pgnum;
     page_t p, sibling, parent;
-    int sibling_index, k_prime_index;
     int64_t k_prime;
+    int sibling_index, k_prime_index;
 
     /* Delete the entry from page.
      */
@@ -786,7 +788,7 @@ void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
         i++;
         while (p.entries[i - 1].child != child_pgnum) i++;
     }
-    for (; i <= p.num_keys; i++) {
+    for (; i < p.num_keys; i++) {
         if (i == 0) p.left_child = p.entries[0].child;
         else p.entries[i - 1].child = p.entries[i].child;
     }
