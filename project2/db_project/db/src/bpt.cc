@@ -24,19 +24,19 @@ int64_t open_table(char* pathname) {
  */
 int db_find(int64_t table_id, int64_t key,
             char* ret_val = NULL, uint16_t* val_size = NULL) {
-    pagenum_t page_num;
-    page_t page;
+    pagenum_t p_pgnum;
+    page_t p;
     int i;
-    page_num = find_leaf(table_id, key);
-    if (page_num == 0) return -1;
-    file_read_page(table_id, page_num, &page);
-    for (i = 0; i < page.num_keys; i++) {
-        if (page.slots[i].key == key) break;
+    p_pgnum = find_leaf(table_id, key);
+    if (p_pgnum == 0) return -1;
+    file_read_page(table_id, p_pgnum, &p);
+    for (i = 0; i < p.num_keys; i++) {
+        if (p.slots[i].key == key) break;
     }
-    if (i == page.num_keys) return -1;
+    if (i == p.num_keys) return -1;
     if (ret_val == NULL || val_size == NULL) return 1;
-    memcpy(ret_val, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
-    *val_size = page.slots[i].size;
+    memcpy(ret_val, p.values + p.slots[i].offset - HEADER_SIZE, p.slots[i].size);
+    *val_size = p.slots[i].size;
     return 0;
 }
 
@@ -45,21 +45,21 @@ int db_find(int64_t table_id, int64_t key,
  */
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
     int i;
-    pagenum_t temp_pgnum;
-    page_t temp;
-    temp_pgnum = get_root_num(table_id);
-    if (temp_pgnum == 0) return 0;
-    file_read_page(table_id, temp_pgnum, &temp);
-    while (!temp.is_leaf) {
+    pagenum_t p_pgnum;
+    page_t p;
+    p_pgnum = get_root_num(table_id);
+    if (p_pgnum == 0) return 0;
+    file_read_page(table_id, p_pgnum, &p);
+    while (!p.is_leaf) {
         i = 0;
-        while (i < temp.num_keys) {
-            if (key >= temp.entries[i].key) i++;
+        while (i < p.num_keys) {
+            if (key >= p.entries[i].key) i++;
             else break;
         }
-        temp_pgnum = i ? temp.entries[i - 1].child : temp.left_child;
-        file_read_page(table_id, temp_pgnum, &temp);
+        p_pgnum = i ? p.entries[i - 1].child : p.left_child;
+        file_read_page(table_id, p_pgnum, &p);
     }
-    return temp_pgnum;
+    return p_pgnum;
 }
 
 // INSERTION
@@ -290,11 +290,10 @@ void insert_into_parent(int64_t table_id,
  */
 void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
                       int left_index, int64_t key, pagenum_t right_pgnum) {
-    page_t p, right;
+    page_t p;
     int i;
 
     file_read_page(table_id, p_pgnum, &p);
-    file_read_page(table_id, right_pgnum, &right);
 
     for (i = p.num_keys; i > left_index; i--) {
         p.entries[i].key = p.entries[i - 1].key;
@@ -442,15 +441,15 @@ void insert_into_new_root(int64_t table_id,
  * and then adpapting it appropriately.
  */
 pagenum_t make_leaf(int64_t table_id) {
-    pagenum_t leaf_pgnum;
-    page_t leaf_page;
-    leaf_pgnum = make_page(table_id);
-    file_read_page(table_id, leaf_pgnum, &leaf_page);
-    leaf_page.is_leaf = 1;
-    leaf_page.free_space = FREE_SPACE;
-    leaf_page.sibling = 0;
-    file_write_page(table_id, leaf_pgnum, &leaf_page);
-    return leaf_pgnum;
+    pagenum_t new_pgnum;
+    page_t new_leaf;
+    new_pgnum = make_page(table_id);
+    file_read_page(table_id, new_pgnum, &new_leaf);
+    new_leaf.is_leaf = 1;
+    new_leaf.free_space = FREE_SPACE;
+    new_leaf.sibling = 0;
+    file_write_page(table_id, new_pgnum, &new_leaf);
+    return new_pgnum;
 }
 
 /* Creates a new general page, which can be adapted
@@ -473,8 +472,8 @@ pagenum_t make_page(int64_t table_id) {
  * the page to the left of the key to be inserted.
  */
 int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnum) {
-    int left_index;
     page_t parent;
+    int left_index;
     file_read_page(table_id, parent_pgnum, &parent);
     left_index = 0;
     if (parent.left_child == left_pgnum) return left_index;
@@ -709,8 +708,8 @@ void delete_from_child(int64_t table_id,
                        pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
     pagenum_t sibling_pgnum;
     page_t p, sibling, parent;
-    int64_t k_prime;
     int sibling_index, k_prime_index;
+    int64_t k_prime;
 
     /* Delete the entry from page.
      */
@@ -860,7 +859,7 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
 void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
                         pagenum_t sibling_pgnum, int sibling_index,
                         int k_prime_index, int64_t k_prime) {
-    page_t p, sibling, parent, temp;
+    page_t p, sibling, parent, child;
     int i;
 
     file_read_page(table_id, p_pgnum, &p);
@@ -878,9 +877,9 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
         p.entries[0].child = p.left_child;
 
         p.left_child = sibling.entries[sibling.num_keys - 1].child;
-        file_read_page(table_id, p.left_child, &temp);
-        temp.parent = p_pgnum;
-        file_write_page(table_id, p.left_child, &temp);
+        file_read_page(table_id, p.left_child, &child);
+        child.parent = p_pgnum;
+        file_write_page(table_id, p.left_child, &child);
         p.entries[0].key = k_prime;
 
         file_read_page(table_id, p.parent, &parent);
@@ -896,9 +895,9 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
     else {
         p.entries[p.num_keys].key = k_prime;
         p.entries[p.num_keys].child = sibling.left_child;
-        file_read_page(table_id, p.entries[p.num_keys].child, &temp);
-        temp.parent = p_pgnum;
-        file_write_page(table_id, p.entries[p.num_keys].child, &temp);
+        file_read_page(table_id, p.entries[p.num_keys].child, &child);
+        child.parent = p_pgnum;
+        file_write_page(table_id, p.entries[p.num_keys].child, &child);
 
         file_read_page(table_id, p.parent, &parent);
         parent.entries[k_prime_index].key = sibling.entries[0].key;
@@ -948,12 +947,12 @@ void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
  */
 int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
     page_t p, parent;
-    int i;
+    int sibling_index;
     file_read_page(table_id, p_pgnum, &p);
     file_read_page(table_id, p.parent, &parent);
-    for (i = 0; i < parent.num_keys; i++) {
-        if (parent.entries[i].child == p_pgnum) {
-            return i;
+    for (sibling_index = 0; sibling_index < parent.num_keys; sibling_index++) {
+        if (parent.entries[sibling_index].child == p_pgnum) {
+            return sibling_index;
         }
     }
     return -1;
