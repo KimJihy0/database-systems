@@ -115,25 +115,25 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
                       int64_t key, char* value, uint16_t val_size) {
     page_t leaf;
-    int i, insertion_point;
+    int i, insertion_index;
     uint16_t offset;
     
     file_read_page(table_id, leaf_pgnum, &leaf);
     
-    insertion_point = 0;
-    while (insertion_point < leaf.num_keys && leaf.slots[insertion_point].key < key) {
-        insertion_point++;
+    insertion_index = 0;
+    while (insertion_index < leaf.num_keys && leaf.slots[insertion_index].key < key) {
+        insertion_index++;
     }
     offset = leaf.free_space + SLOT_SIZE * leaf.num_keys;
 
-    for (i = leaf.num_keys; i > insertion_point; i--) {
+    for (i = leaf.num_keys; i > insertion_index; i--) {
         leaf.slots[i].key = leaf.slots[i - 1].key;
         leaf.slots[i].size = leaf.slots[i - 1].size;
         leaf.slots[i].offset = leaf.slots[i - 1].offset;
     }
-    leaf.slots[insertion_point].key = key;
-    leaf.slots[insertion_point].size = val_size;
-    leaf.slots[insertion_point].offset = offset - val_size + HEADER_SIZE;
+    leaf.slots[insertion_index].key = key;
+    leaf.slots[insertion_index].size = val_size;
+    leaf.slots[insertion_index].offset = offset - val_size + HEADER_SIZE;
     memcpy(leaf.values + offset - val_size, value, val_size);
 
     leaf.num_keys++;
@@ -316,7 +316,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     page_t old_page, right, new_page, child;
     int64_t k_prime;
     int i, j, split;
-    pagenum_t left_child;
+    pagenum_t temp_left_child;
     entry_t temp[ENTRY_ORDER];
     
     file_read_page(table_id, old_pgnum, &old_page);
@@ -330,7 +330,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
      * the other half to the new page.
      */
 
-    left_child = old_page.left_child;
+    temp_left_child = old_page.left_child;
     for (i = 0, j = 0; i < old_page.num_keys; i++, j++) {
         if (j == left_index) j++;
         temp[j].child = old_page.entries[i].child;
@@ -353,7 +353,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     file_read_page(table_id, new_pgnum, &new_page);
     
     old_page.num_keys = 0;
-    old_page.left_child = left_child;
+    old_page.left_child = temp_left_child;
     for (i = 0; i < split - 1; i++) {
         old_page.entries[i].child = temp[i].child;
         old_page.entries[i].key = temp[i].key;
@@ -366,7 +366,8 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
         new_page.entries[j].key = temp[i].key;
         new_page.num_keys++;
     }
-
+    new_page.parent = old_page.parent;
+    
     file_read_page(table_id, new_page.left_child, &child);
     child.parent = new_pgnum;
     file_write_page(table_id, new_page.left_child, &child);
@@ -656,7 +657,7 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                          pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
     page_t leaf, sibling, parent;
     int i, src_index, dest_index;
-    int16_t src_size, offset;
+    int16_t src_size, dest_offset;
 
     file_read_page(table_id, leaf_pgnum, &leaf);
     file_read_page(table_id, sibling_pgnum, &sibling);
@@ -668,7 +669,7 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
         src_index = (sibling_index != -1) ? sibling.num_keys - 1 : 0;
         dest_index = (sibling_index != -1) ? 0 : leaf.num_keys;
         src_size = sibling.slots[src_index].size;
-        offset = leaf.free_space + SLOT_SIZE * leaf.num_keys - src_size;
+        dest_offset = leaf.free_space + SLOT_SIZE * leaf.num_keys - src_size;
 
         if (sibling_index != -1) {
             for (i = leaf.num_keys; i > 0; i--) {
@@ -679,8 +680,8 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
         }
         leaf.slots[dest_index].key = sibling.slots[src_index].key;
         leaf.slots[dest_index].size = sibling.slots[src_index].size;
-        leaf.slots[dest_index].offset = offset + HEADER_SIZE;
-        memcpy(leaf.values + offset,
+        leaf.slots[dest_index].offset = dest_offset + HEADER_SIZE;
+        memcpy(leaf.values + dest_offset,
                 sibling.values + sibling.slots[src_index].offset - HEADER_SIZE,
                 src_size);
         
@@ -804,7 +805,7 @@ void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
 void merge_pages(int64_t table_id, pagenum_t p_pgnum,
                  pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
     page_t p, sibling, nephew;
-    int i, j, sibling_insertion_index, p_end;
+    int i, j, insertion_index, p_end;
     
     /* Swap sibling with page if page is on the
      * extreme left and sibling is to its right.
@@ -821,22 +822,22 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
     /* Starting point in the sibling for copying
      * entries from n.
      */
-    sibling_insertion_index = sibling.num_keys;
+    insertion_index = sibling.num_keys;
 
     /* Append k_prime.
      */
-    sibling.entries[sibling_insertion_index].key = k_prime;
+    sibling.entries[insertion_index].key = k_prime;
     sibling.num_keys++;
 
     /* Merge.
      */
     p_end = p.num_keys;
-    for (i = sibling_insertion_index + 1, j = 0; j < p_end; i++, j++) {
+    for (i = insertion_index + 1, j = 0; j < p_end; i++, j++) {
         sibling.entries[i].key = p.entries[j].key;
         sibling.entries[i].child = p.entries[j].child;
         sibling.num_keys++;
     }
-    sibling.entries[sibling_insertion_index].child = p.left_child;
+    sibling.entries[insertion_index].child = p.left_child;
 
     /* All children must now point up to the same parnet.
      */
@@ -921,7 +922,6 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
  */
 void end_tree(int64_t table_id, pagenum_t root_pgnum) {
     set_root_num(table_id, 0);
-
     file_free_page(table_id, root_pgnum);
 }
 
