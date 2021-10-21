@@ -42,19 +42,18 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
             }
         }
         if (i == buf_size) {
-            printf("replacement");
+            // printf("replacement");
             for (victim = buffers[get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
                 if (victim->is_pinned == 0) break;
             }
             if (victim == NULL) return -1;
             buffer_idx = get_buffer_idx(victim->table_id, victim->page_num);
             if (buffers[buffer_idx]->is_dirty) {
-                printf(" / flush");
+                // printf(" / flush");
                 file_write_page(buffers[buffer_idx]->table_id,
                                 buffers[buffer_idx]->page_num,
                                 &(buffers[buffer_idx]->frame));
             }
-            printf("\n");
         }
         file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         buffers[buffer_idx]->table_id = table_id;
@@ -141,15 +140,20 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src_
 
 pagenum_t get_root_num(int64_t table_id) {
     page_t* header;
-    buffer_read_page(table_id, 0, &header);
-    return header->root_num;
+    int header_idx = buffer_read_page(table_id, 0, &header);
+    if (header_idx != -1) buffers[header_idx]->is_pinned++;
+    pagenum_t root_num = header->root_num;
+    if (header_idx != -1) buffers[header_idx]->is_pinned--;
+    return root_num;
 }
 
 void set_root_num(int64_t table_id, pagenum_t root_num) {
     page_t* header;
-    buffer_read_page(table_id, 0, &header);
+    int header_idx = buffer_read_page(table_id, 0, &header);
+    if (header_idx != -1) buffers[header_idx]->is_pinned++;
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
+    if (header_idx != -1) buffers[header_idx]->is_pinned--;
 }
 
 /* ---To do---

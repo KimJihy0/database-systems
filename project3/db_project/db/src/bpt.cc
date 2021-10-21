@@ -27,6 +27,12 @@ int shutdown_db() {
             file_write_page(buffers[i]->table_id,
                             buffers[i]->page_num,
                             &(buffers[i]->frame));
+            printf("%d,", buffers[i]->is_pinned);
+            if (buffers[i]->is_pinned) {
+                printf("-----strange frame-----\n");
+                printf("page_num: %ld\n", buffers[i]->page_num);
+                printf("is_pinned: %d\n", buffers[i]->is_pinned);
+            }
             free(buffers[i]);
         }
     }
@@ -411,6 +417,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     new_pgnum = make_page(table_id);
 
     int new_idx = buffer_read_page(table_id, new_pgnum, &new_page);
+    if (new_idx != -1) buffers[new_idx]->is_pinned++;
     
     old_page->num_keys = 0;
     old_page->left_child = temp_left_child;
@@ -443,7 +450,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     }
     
     buffer_write_page(table_id, new_pgnum, &new_page);
-    if (new_idx != -1) buffers[new_idx]->is_pinned++;
+    if (new_idx != -1) buffers[new_idx]->is_pinned--;
     buffer_write_page(table_id, old_pgnum, &old_page);
     if (old_idx != -1) buffers[old_idx]->is_pinned--;
 
