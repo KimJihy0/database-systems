@@ -84,7 +84,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
     page_t* p;
     p_pgnum = get_root_num(table_id);
     if (p_pgnum == 0) return 0;
-
+    buffer_read_page(table_id, p_pgnum, &p);
     while (!p->is_leaf) {
         i = 0;
         while (i < p->num_keys) {
@@ -92,7 +92,6 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
             else break;
         }
         p_pgnum = i ? p->entries[i - 1].child : p->left_child;
-
         buffer_read_page(table_id, p_pgnum, &p);
     }
     return p_pgnum;
@@ -127,7 +126,6 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
      */
 
     leaf_pgnum = find_leaf(table_id, key);
-    printf("leaf_pgnum: %ld\n", leaf_pgnum);
 
     buffer_read_page(table_id, leaf_pgnum, &leaf);
 
@@ -142,7 +140,6 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
      * Need to be split.
      */
     else {
-        printf("leaf->free_space: %ld\n\n", leaf->free_space);
         insert_into_leaf_split(table_id, leaf_pgnum, key, value, val_size);
     }
 
@@ -193,8 +190,6 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     uint16_t offset;
     slot_t temp_slots[65];
     char temp_values[3968];
-
-    printf("insert_into_leaf_spilt\n");
     
     buffer_read_page(table_id, leaf_pgnum, &leaf);
     
@@ -240,8 +235,8 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     }
     new_pgnum = make_leaf(table_id);
 
-    printf("new_idx: %d\n", buffer_read_page(table_id, new_pgnum, &new_leaf));
-    printf("new_page->free_space: %ld\n", new_leaf->free_space);
+
+    buffer_read_page(table_id, new_pgnum, &new_leaf);
     
     offset = FREE_SPACE;
     for (i = 0; i < split; i++) {
@@ -270,9 +265,6 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     new_leaf->sibling = leaf->sibling;
     leaf->sibling = new_pgnum;
 
-    printf("old_page->free_space: %ld\n", leaf->free_space);
-    printf("new_page->free_space: %ld\n", new_leaf->free_space);
-
     new_leaf->parent = leaf->parent;
     new_key = new_leaf->slots[0].key;
 
@@ -296,8 +288,8 @@ void insert_into_parent(int64_t table_id,
     page_t* left, * right, * parent;
     int left_index;
 
-    printf("left_idx: %d\n", buffer_read_page(table_id, left_pgnum, &left));
-    printf("right_idx: %d\n", buffer_read_page(table_id, right_pgnum, &right));
+    buffer_read_page(table_id, left_pgnum, &left);
+    buffer_read_page(table_id, right_pgnum, &right);
 
     /* Case: new root.
      */
@@ -742,8 +734,8 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
     
     buffer_read_page(table_id, leaf->parent, &parent);
     parent->entries[k_prime_index].key = (sibling_index != -1) ?
-                                         leaf->slots[0].key :
-                                         sibling->slots[0].key;
+                                        leaf->slots[0].key :
+                                        sibling->slots[0].key;
     buffer_write_page(table_id, leaf->parent, &parent);
 }
 

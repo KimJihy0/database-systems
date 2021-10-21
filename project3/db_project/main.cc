@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <random>
 
-#define NUM_KEYS 47
-#define NUM_BUFS 200
+#define NUM_KEYS 10000
+#define NUM_BUFS 150
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -60,8 +60,8 @@ int main(int argc, char** argv) {
 
 	print_tree(table_id);
 	printf("\n");
-	print_all(table_id);
-	print_buffers();
+	// print_all(table_id);
+	// print_buffers();
 	goto func_exit;
 
 	printf("[FIND START]\n");

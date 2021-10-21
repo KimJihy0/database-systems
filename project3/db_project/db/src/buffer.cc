@@ -152,10 +152,11 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
 /* ---To do---
  * Find에서 Input/ouput error 이유찾기.
  * doubling시 버퍼처리
+ * Index manager : read_page(), write_page(), ...
+ * Disk manager : read_page(), write_page(), ...
  * replacement시 pin?
  * is_pinned 최적화**********(그냥 함수시작끝에 각각?)
  * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
- * page_t* const* ? const* page_t*?
  * 
  * ---Done---
  * all buffers are in use. 처리
