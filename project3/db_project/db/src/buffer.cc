@@ -42,16 +42,19 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
             }
         }
         if (i == buf_size) {
+            printf("replacement");
             for (victim = buffers[get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
                 if (victim->is_pinned == 0) break;
             }
             if (victim == NULL) return -1;
             buffer_idx = get_buffer_idx(victim->table_id, victim->page_num);
             if (buffers[buffer_idx]->is_dirty) {
+                printf(" / flush");
                 file_write_page(buffers[buffer_idx]->table_id,
                                 buffers[buffer_idx]->page_num,
                                 &(buffers[buffer_idx]->frame));
             }
+            printf("\n");
         }
         file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         buffers[buffer_idx]->table_id = table_id;
@@ -157,6 +160,8 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
  * replacement시 pin?
  * is_pinned 최적화**********(그냥 함수시작끝에 각각?)
  * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
+ * pin 위치 index -> buffer로 이동
+ * unpin 타이밍 당기기
  * 
  * ---Done---
  * all buffers are in use. 처리

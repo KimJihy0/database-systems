@@ -7,7 +7,7 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 150
+#define NUM_BUFS 200
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -26,16 +26,16 @@ char* val(int key);
 int size();
 int size(int key);
 
-#if 0
+#if 1
 int main(int argc, char** arv) {
-	init_db(200);
+	init_db(NUM_BUFS);
 	int64_t table_id = open_table((char*)"table0");
-	print_all_from_disk(table_id);
+	// print_all_from_disk(table_id);
 	print_tree_from_disk(table_id);
 }
 #endif
 
-#if 1
+#if 0
 int main(int argc, char** argv) {
 	vector<int> keys;
 	for (int i = 0; i < NUM_KEYS; i++) {

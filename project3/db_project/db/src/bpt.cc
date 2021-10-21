@@ -79,12 +79,13 @@ int db_find(int64_t table_id, int64_t key,
  * Returns a page # of the leaf containg the given key.
  */
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
-    int i;
+    int i, p_idx;
     pagenum_t p_pgnum;
     page_t* p;
     p_pgnum = get_root_num(table_id);
     if (p_pgnum == 0) return 0;
-    buffer_read_page(table_id, p_pgnum, &p);
+    p_idx = buffer_read_page(table_id, p_pgnum, &p);
+    if (p_idx != -1) buffers[p_idx]->is_pinned++;
     while (!p->is_leaf) {
         i = 0;
         while (i < p->num_keys) {
@@ -92,8 +93,11 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
             else break;
         }
         p_pgnum = i ? p->entries[i - 1].child : p->left_child;
-        buffer_read_page(table_id, p_pgnum, &p);
+        if (p_idx != -1) buffers[p_idx]->is_pinned--;
+        p_idx = buffer_read_page(table_id, p_pgnum, &p);
+        if (p_idx != -1) buffers[p_idx]->is_pinned++;
     }
+    if (p_idx != -1) buffers[p_idx]->is_pinned--;
     return p_pgnum;
 }
 
@@ -127,7 +131,8 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
     leaf_pgnum = find_leaf(table_id, key);
 
-    buffer_read_page(table_id, leaf_pgnum, &leaf);
+    int leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned++;
 
     /* Case: enough free space to insert.
      * Nothing to do.
@@ -143,6 +148,7 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
         insert_into_leaf_split(table_id, leaf_pgnum, key, value, val_size);
     }
 
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned--;
     return 0;
 }
 
@@ -154,7 +160,8 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
     int i, insertion_index;
     uint16_t offset;
     
-    buffer_read_page(table_id, leaf_pgnum, &leaf);
+    int leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned++;
     
     insertion_index = 0;
     while (insertion_index < leaf->num_keys && leaf->slots[insertion_index].key < key) {
@@ -176,6 +183,7 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
     leaf->free_space -= (SLOT_SIZE + val_size);
 
     buffer_write_page(table_id, leaf_pgnum, &leaf);
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned--;
 }
 
 /* Inserts new record into a leaf so as to exceed
@@ -191,7 +199,8 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     slot_t temp_slots[65];
     char temp_values[3968];
     
-    buffer_read_page(table_id, leaf_pgnum, &leaf);
+    int leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned++;
     
     /* First create a temporary set of records
      * to hold everything in order, including
@@ -235,8 +244,8 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     }
     new_pgnum = make_leaf(table_id);
 
-
-    buffer_read_page(table_id, new_pgnum, &new_leaf);
+    int new_idx = buffer_read_page(table_id, new_pgnum, &new_leaf);
+    if (new_idx != -1) buffers[new_idx]->is_pinned++;
     
     offset = FREE_SPACE;
     for (i = 0; i < split; i++) {
@@ -269,7 +278,9 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     new_key = new_leaf->slots[0].key;
 
     buffer_write_page(table_id, leaf_pgnum, &leaf);
+    if (leaf_idx != -1) buffers[leaf_idx]->is_pinned--;
     buffer_write_page(table_id, new_pgnum, &new_leaf);
+    if (new_idx != -1) buffers[new_idx]->is_pinned--;
 
     /* Insert a new key into the parent of the two
      * leafs resulting from the split, with
@@ -288,8 +299,10 @@ void insert_into_parent(int64_t table_id,
     page_t* left, * right, * parent;
     int left_index;
 
-    buffer_read_page(table_id, left_pgnum, &left);
-    buffer_read_page(table_id, right_pgnum, &right);
+    int left_idx = buffer_read_page(table_id, left_pgnum, &left);
+    if (left_idx != -1) buffers[left_idx]->is_pinned++;
+    int right_idx = buffer_read_page(table_id, right_pgnum, &right);
+    if (right_idx != -1) buffers[right_idx]->is_pinned++;
 
     /* Case: new root.
      */
@@ -304,7 +317,8 @@ void insert_into_parent(int64_t table_id,
 
     parent_pgnum = left->parent;
 
-    buffer_read_page(table_id, parent_pgnum, &parent);
+    int parent_idx = buffer_read_page(table_id, parent_pgnum, &parent);
+    if (parent_idx != -1) buffers[parent_idx]->is_pinned++;
 
     left_index = get_left_index(table_id, parent_pgnum, left_pgnum);
     
@@ -322,6 +336,9 @@ void insert_into_parent(int64_t table_id,
         insert_into_page_split(table_id, parent_pgnum, left_index, key, right_pgnum);
     }
     
+    if (left_idx != -1) buffers[left_idx]->is_pinned--;
+    if (right_idx != -1) buffers[right_idx]->is_pinned--;
+    if (parent_idx != -1) buffers[parent_idx]->is_pinned--;
 }
 
 /* Inserts new entry into a page.
@@ -331,7 +348,8 @@ void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
     page_t* p;
     int i;
 
-    buffer_read_page(table_id, p_pgnum, &p);
+    int p_idx = buffer_read_page(table_id, p_pgnum, &p);
+    if (p_idx != -1) buffers[p_idx]->is_pinned++;
 
     for (i = p->num_keys; i > left_index; i--) {
         p->entries[i].key = p->entries[i - 1].key;
@@ -342,6 +360,7 @@ void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
     p->num_keys++;
 
     buffer_write_page(table_id, p_pgnum, &p);
+    if (p_idx != -1) buffers[p_idx]->is_pinned--;
 }
 
 /* Inserts new entry into a page so as to exceed
@@ -356,8 +375,10 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     pagenum_t temp_left_child;
     entry_t temp[ENTRY_ORDER];
     
-    buffer_read_page(table_id, old_pgnum, &old_page);
-    buffer_read_page(table_id, right_pgnum, &right);
+    int old_idx = buffer_read_page(table_id, old_pgnum, &old_page);
+    if (old_idx != -1) buffers[old_idx]->is_pinned++;
+    int right_idx = buffer_read_page(table_id, right_pgnum, &right);
+    if (right_idx != -1) buffers[right_idx]->is_pinned++;
 
     /* First create a temporary set of entries
      * to hold everything in order, including
@@ -379,6 +400,8 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     temp[left_index].child = right_pgnum;
     temp[left_index].key = key;
 
+    if (right_idx != -1) buffers[right_idx]->is_pinned--;
+
     /* Create the new page and copy
      * half the entries to the
      * old and half to the new.
@@ -387,7 +410,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     split = ENTRY_ORDER / 2 + 1;
     new_pgnum = make_page(table_id);
 
-    buffer_read_page(table_id, new_pgnum, &new_page);
+    int new_idx = buffer_read_page(table_id, new_pgnum, &new_page);
     
     old_page->num_keys = 0;
     old_page->left_child = temp_left_child;
@@ -405,17 +428,24 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     }
     new_page->parent = old_page->parent;
     
-    buffer_read_page(table_id, new_page->left_child, &child);
+    int child_idx;
+    child_idx = buffer_read_page(table_id, new_page->left_child, &child);
+    if (child_idx != -1) buffers[child_idx]->is_pinned++;
     child->parent = new_pgnum;
     buffer_write_page(table_id, new_page->left_child, &child);
+    if (child_idx != -1) buffers[child_idx]->is_pinned--;
     for (i = 0; i < new_page->num_keys; i++) {
-        buffer_read_page(table_id, new_page->entries[i].child, &child);
+        child_idx = buffer_read_page(table_id, new_page->entries[i].child, &child);
+        if (child_idx != -1) buffers[child_idx]->is_pinned++;
         child->parent = new_pgnum;
         buffer_write_page(table_id, new_page->entries[i].child, &child);
+        if (child_idx != -1) buffers[child_idx]->is_pinned--;
     }
     
     buffer_write_page(table_id, new_pgnum, &new_page);
+    if (new_idx != -1) buffers[new_idx]->is_pinned++;
     buffer_write_page(table_id, old_pgnum, &old_page);
+    if (old_idx != -1) buffers[old_idx]->is_pinned--;
 
     /* Insert a new key into the parent of the two
      * pages resulting from the split, with
@@ -433,7 +463,8 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
     root_pgnum = make_leaf(table_id);
 
-    buffer_read_page(table_id, root_pgnum, &root);
+    int root_idx = buffer_read_page(table_id, root_pgnum, &root);
+    if (root_idx != -1) buffers[root_idx]->is_pinned++;
 
     root->slots[0].key = key;
     root->slots[0].size = val_size;
@@ -445,6 +476,7 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     set_root_num(table_id, root_pgnum);
 
     buffer_write_page(table_id, root_pgnum, &root);
+    if (root_idx != -1) buffers[root_idx]->is_pinned--;
 }
 
 /* Creates a new root for two subtrees
@@ -457,9 +489,12 @@ void insert_into_new_root(int64_t table_id,
     
     root_pgnum = make_page(table_id);
 
-    buffer_read_page(table_id, left_pgnum, &left);
-    buffer_read_page(table_id, right_pgnum, &right);
-    buffer_read_page(table_id, root_pgnum, &root);
+    int left_idx = buffer_read_page(table_id, left_pgnum, &left);
+    if (left_idx != -1) buffers[left_idx]->is_pinned++;
+    int right_idx = buffer_read_page(table_id, right_pgnum, &right);
+    if (right_idx != -1) buffers[right_idx]->is_pinned++;
+    int root_idx = buffer_read_page(table_id, root_pgnum, &root);
+    if (root_idx != -1) buffers[root_idx]->is_pinned++;
 
     root->left_child = left_pgnum;
     root->entries[0].key = key;
@@ -472,8 +507,11 @@ void insert_into_new_root(int64_t table_id,
     set_root_num(table_id, root_pgnum);
 
     buffer_write_page(table_id, left_pgnum, &left);
+    if (left_idx != -1) buffers[left_idx]->is_pinned--;
     buffer_write_page(table_id, right_pgnum, &right);
+    if (right_idx != -1) buffers[right_idx]->is_pinned--;
     buffer_write_page(table_id, root_pgnum, &root);
+    if (root_idx != -1) buffers[root_idx]->is_pinned--;
 }
 
 /* Creates a new leaf by creating a page
@@ -483,11 +521,13 @@ pagenum_t make_leaf(int64_t table_id) {
     pagenum_t new_pgnum;
     page_t* new_leaf;
     new_pgnum = make_page(table_id);
-    buffer_read_page(table_id, new_pgnum, &new_leaf);
+    int new_idx = buffer_read_page(table_id, new_pgnum, &new_leaf);
+    if (new_idx != -1) buffers[new_idx]->is_pinned++;
     new_leaf->is_leaf = 1;
     new_leaf->free_space = FREE_SPACE;
     new_leaf->sibling = 0;
     buffer_write_page(table_id, new_pgnum, &new_leaf);
+    if (new_idx != -1) buffers[new_idx]->is_pinned--;
     return new_pgnum;
 }
 
@@ -498,11 +538,13 @@ pagenum_t make_page(int64_t table_id) {
     pagenum_t new_pgnum;
     page_t* new_page;
     new_pgnum = buffer_alloc_page(table_id);
-    buffer_read_page(table_id, new_pgnum, &new_page);
+    int new_idx = buffer_read_page(table_id, new_pgnum, &new_page);
+    if (new_idx != -1) buffers[new_idx]->is_pinned++;
     new_page->parent = 0;
     new_page->is_leaf = 0;
     new_page->num_keys = 0;
     buffer_write_page(table_id, new_pgnum, &new_page);
+    if (new_idx != -1) buffers[new_idx]->is_pinned--;
     return new_pgnum;
 }
 
@@ -513,12 +555,14 @@ pagenum_t make_page(int64_t table_id) {
 int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnum) {
     page_t* parent;
     int left_index;
-    buffer_read_page(table_id, parent_pgnum, &parent);
+    int parent_idx = buffer_read_page(table_id, parent_pgnum, &parent);
+    if (parent_idx != -1) buffers[parent_idx]->is_pinned++;
     left_index = 0;
     if (parent->left_child == left_pgnum) return left_index;
     while (parent->entries[left_index].child != left_pgnum) {
         left_index++;
     }
+    if (parent_idx != -1) buffers[parent_idx]->is_pinned--;
     return ++left_index;
 }
 
