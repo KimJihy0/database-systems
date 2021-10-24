@@ -5,10 +5,10 @@ table_t tables[NUM_TABLES];
 // Open existing table file or create one if not existed
 int64_t file_open_table_file(const char* pathname) {
 	int fd;
-	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0777);
+	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0666);
 	// file exists
 	if (fd < 0 && errno == EEXIST) {
-		fd = open(pathname, O_RDWR|O_SYNC, 0777);
+		fd = open(pathname, O_RDWR|O_SYNC, 0666);
 		if (fd < 0) {
 			perror("Failure to open table file(open error)");
 			exit(EXIT_FAILURE);

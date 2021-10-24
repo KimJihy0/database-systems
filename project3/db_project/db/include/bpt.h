@@ -9,6 +9,10 @@
 #define ENTRY_ORDER 249
 #define THRESHOLD 2500
 
+void print_buffers();
+
+
+
 // DBMS
 
 int init_db(int num_buf);

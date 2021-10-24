@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <random>
 
-#define NUM_KEYS 10000
-#define NUM_BUFS 300
+#define NUM_KEYS 1000
+#define NUM_BUFS 3
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -20,22 +20,34 @@ void print_tree(int64_t table_id);
 int path_to_root_from_disk(int64_t table_id, pagenum_t child_num);
 void print_tree_from_disk(int64_t table_id);
 int64_t free_num(int64_t table_id);
-void print_buffers();
+// void print_buffers();
 
 char* val(int key);
 int size();
 int size(int key);
 
-#if 0
-int main(int argc, char** arv) {
-	init_db(NUM_BUFS);
-	int64_t table_id = open_table((char*)"table0");
-	// print_all_from_disk(table_id);
-	print_tree_from_disk(table_id);
+#if 1
+void test_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
+
+	file_read_page(table_id, page_num, *dest_page);
+}
+int main(int argc, char** argv) {
+	init_db(200);
+	int64_t table_id = open_table((char*)"test_table");
+
+	page_t* header;
+	header = (page_t*)malloc(sizeof(page_t));
+	
+	test_read_page(table_id, 0, &header);
+	
+	printf("header->free_num: %ld\n", header->free_num);
+	printf("header->num_pages: %ld\n", header->num_pages);
+	printf("header->root_num: %ld\n", header->root_num);
+		
 }
 #endif
 
-#if 1
+#if 0
 int main(int argc, char** argv) {
 	vector<int> keys;
 	for (int i = 0; i < NUM_KEYS; i++) {
@@ -54,30 +66,28 @@ int main(int argc, char** argv) {
 
 	printf("[INSERT START]\n");
 	for (const auto& i : keys) {
+		// printf("insert %4d\n", i);
 		if (db_insert(table_id, i, val(i), size(i)) != 0) goto func_exit;
+		// print_buffers();
 	}
 	printf("[INSERT END]\n\n");
-
-	// print_tree(table_id);
-	printf("\n");
-	// print_all(table_id);
-	// print_buffers();
-	goto func_exit;
 
 	printf("[FIND START]\n");
 	for (const auto& i : keys) {
 		memset(value, 0x00, 112);
 		val_size = 0;
+		// printf("find %4d\n", i);
 		if (db_find(table_id, i, value, &val_size) != 0) goto func_exit;
-		else if (size(i) != val_size ||
-				 val(i) != std::string(value, val_size)) {
-			printf("value dismatched\n");
-			goto func_exit;
-		}
+		// else if (size(i) != val_size ||
+		// 		 val(i) != std::string(value, val_size)) {
+		// 	printf("value dismatched\n");
+		// 	goto func_exit;
+		// }
 	}
 	printf("[FIND END]\n\n");
 
 	print_tree(table_id);
+	goto func_exit;
 
 	printf("[DELETE START]\n");
 	for (const auto& i : keys) {
@@ -184,7 +194,7 @@ void print_page(pagenum_t page_num, page_t page) {
 void print_pgnum(int64_t table_id, pagenum_t page_num) {
 	page_t* page;
 	int idx = buffer_read_page(table_id, page_num, &page);
-	if (idx != -1) buffers[idx]->is_pinned++;
+	// if (idx != -1) buffers[idx]->is_pinned++;
 	print_page(page_num, *page);
 	if (idx != -1) buffers[idx]->is_pinned--;
 }
@@ -200,7 +210,7 @@ void print_all(int64_t table_id) {
 	if (!root_num) return;
 
     int root_idx = buffer_read_page(table_id, root_num, &root);
-	if (root_idx != -1) buffers[root_idx]->is_pinned++;
+	// if (root_idx != -1) buffers[root_idx]->is_pinned++;
     print_page(root_num, *root);
     if (root->is_leaf) return;
 
@@ -208,13 +218,13 @@ void print_all(int64_t table_id) {
 
     temp_num = root->left_child;
     temp_idx = buffer_read_page(table_id, temp_num, &page);
-	if (temp_idx != -1) buffers[temp_idx]->is_pinned++;
+	// if (temp_idx != -1) buffers[temp_idx]->is_pinned++;
     print_page(temp_num, *page);
     for (int i = 0; i < root->num_keys; i++) {
         temp_num = root->entries[i].child;
 		if (temp_idx != -1) buffers[temp_idx]->is_pinned--;
         temp_idx = buffer_read_page(table_id, temp_num, &page);
-		if (temp_idx != -1) buffers[temp_idx]->is_pinned++;
+		// if (temp_idx != -1) buffers[temp_idx]->is_pinned++;
         print_page(temp_num, *page);
     }
 	if (root_idx != -1) buffers[root_idx]->is_pinned--;
@@ -263,12 +273,16 @@ int path_to_root(int64_t table_id, pagenum_t child_num) {
 	pagenum_t c_num = child_num;
 	page_t* c;
 	int c_idx = buffer_read_page(table_id, c_num, &c);
+	#if verbose
 	if (c_idx != -1) buffers[c_idx]->is_pinned++;
+	#endif
 	while (c->parent != 0) {
 		c_num = c->parent;
 		if (c_idx != -1) buffers[c_idx]->is_pinned--;
 		c_idx = buffer_read_page(table_id, c_num, &c);
+		#if verbose
 		if (c_idx != -1) buffers[c_idx]->is_pinned++;
+		#endif
 		length++;
 	}
 	if (c_idx != -1) buffers[c_idx]->is_pinned--;
@@ -293,9 +307,13 @@ void print_tree(int64_t table_id) {
 		p_pgnum = queue.front();
 		queue.pop();
 		p_idx = buffer_read_page(table_id, p_pgnum, &p);
+		#if verbose
 		if (p_idx != -1) buffers[p_idx]->is_pinned++;
+		#endif
 		parent_idx = buffer_read_page(table_id, p->parent, &parent);
+		#if verbose
 		if (parent_idx != -1) buffers[parent_idx]->is_pinned++;
+		#endif
 
 		if (p->parent != 0 && p_pgnum == parent->left_child) {
 			new_rank = path_to_root(table_id, p_pgnum);
@@ -366,28 +384,6 @@ void print_tree_from_disk(int64_t table_id) {
 				queue.push(p.entries[i].child);
 		}
 		printf("| ");
-	}
-	printf("\n");
-}
-
-void print_buffers() {
-	int i;
-	printf("\n");
-	for (i = 0; i < NUM_BUFS; i++) {
-		if (buffers[i] != NULL) {
-			printf("---buffer%02d---\n", i);
-			print_page(buffers[i]->page_num, buffers[i]->frame);
-			printf("table_id: %ld\n", buffers[i]->table_id);
-			printf("page_num: %ld\n", buffers[i]->page_num);
-			printf("is_dirty: %d\n", buffers[i]->is_dirty);
-			printf("is_pinned: %d\n", buffers[i]->is_pinned);
-			if (buffers[i]->next_LRU != NULL) printf("next_LRU: %ld\n", buffers[i]->next_LRU->page_num);
-			else printf("next LRU: NULL\n");
-			if (buffers[i]->prev_LRU != NULL) printf("prev_LRU: %ld\n", buffers[i]->prev_LRU->page_num);
-			else printf("prev LRU: NULL\n");
-			printf("\n");
-		}
-		else break;
 	}
 	printf("\n");
 }

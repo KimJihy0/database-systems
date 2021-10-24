@@ -46,7 +46,10 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
             for (victim = buffers[get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
                 if (victim->is_pinned == 0) break;
             }
-            if (victim == NULL) return -1;
+            if (victim == NULL) {
+                printf("all buffers are in-used.\n");
+                return -1;
+            }
             buffer_idx = get_buffer_idx(victim->table_id, victim->page_num);
             if (buffers[buffer_idx]->is_dirty) {
                 // printf(" / flush");
@@ -81,42 +84,18 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
 }
 
 pagenum_t buffer_alloc_page(int64_t table_id) {
-    page_t* header;
-    buffer_read_page(table_id, 0, &header);
-
-    pagenum_t page_num;
-    if (header->free_num == 0) {
-        page_num = file_double_page(table_id, header->num_pages);
-        header->free_num = page_num - 1;
-        header->num_pages = page_num;
-    }
-
-    page_t* p;
-    page_num = header->free_num;
-    buffer_read_page(table_id, page_num, &p);
-
-	header->free_num = p->next_frpg;
-    buffer_write_page(table_id, 0, &header);
-
-	return page_num;
+    return file_alloc_page(table_id);
 }
 
 void buffer_free_page(int64_t table_id, pagenum_t page_num) {
-    page_t* header;
-    buffer_read_page(table_id, 0, &header);
-
-    page_t* p;
-    p->next_frpg = header->free_num;
-    buffer_write_page(table_id, page_num, &p);
-
-    header->free_num = page_num;
-    buffer_write_page(table_id, 0, &header);
+    file_free_page(table_id, page_num);
 }
 
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
     int buffer_idx;
     buffer_idx = read_buffer(table_id, page_num);
     if (buffer_idx != -1) {
+        buffers[buffer_idx]->is_pinned++;
         *dest_page = &(buffers[buffer_idx]->frame);
     }
     else {
@@ -125,7 +104,7 @@ int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
     return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src_page) {
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t** src_page) {
     int buffer_idx;
     buffer_idx = read_buffer(table_id, page_num);
     if (buffer_idx != -1) {
@@ -141,7 +120,6 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src_
 pagenum_t get_root_num(int64_t table_id) {
     page_t* header;
     int header_idx = buffer_read_page(table_id, 0, &header);
-    if (header_idx != -1) buffers[header_idx]->is_pinned++;
     pagenum_t root_num = header->root_num;
     if (header_idx != -1) buffers[header_idx]->is_pinned--;
     return root_num;
@@ -150,7 +128,6 @@ pagenum_t get_root_num(int64_t table_id) {
 void set_root_num(int64_t table_id, pagenum_t root_num) {
     page_t* header;
     int header_idx = buffer_read_page(table_id, 0, &header);
-    if (header_idx != -1) buffers[header_idx]->is_pinned++;
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
     if (header_idx != -1) buffers[header_idx]->is_pinned--;
@@ -159,19 +136,20 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
 /* ---To do---
  * Find에서 Input/ouput error 이유찾기.
  * doubling시 버퍼처리
- * Index manager : read_page(), write_page(), ...
- * Disk manager : read_page(), write_page(), ...
  * replacement시 pin?
- * is_pinned 최적화**********(그냥 함수시작끝에 각각?)
- * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
  * pin 위치 index -> buffer로 이동
- * unpin 타이밍 당기기
+ * 0644
+ * 구조(page.h, hash.h, hash.cc)
+ * file.h specification 변경금지
+ * linkedlist null 해줘야되나??
  * 
  * ---Done---
+ * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
  * all buffers are in use. 처리
  * 지역변수 -> 동적할당(필요없음)
  * 
  * ---Recent Modification
  * doubling 추가
  * read_buffer에 합침 (빈버퍼 찾았을 때랑 victim 찾았을 때)
+ * buffer_write_page 수정 (인자, 내용)
  */
