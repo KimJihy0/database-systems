@@ -3,6 +3,8 @@
 
 #include "file.h"
 
+#define unpin(i) if(i!=-1)buffers[i]->is_pinned--; 
+
 struct buffer_t {
     page_t frame;
     int64_t table_id;
@@ -21,12 +23,10 @@ int get_last_LRU_idx();
 int get_buffer_idx(int64_t table_id, pagenum_t page_num);
 int read_buffer(int64_t table_id, pagenum_t page_num);
 
-// int64_t file_open_table_file(const char* pathname);
 pagenum_t buffer_alloc_page(int64_t table_id);
 void buffer_free_page(int64_t table_id, pagenum_t page_num);
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page);
 void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t** src_page);
-// void file_close_table_file();
 
 pagenum_t get_root_num(int64_t table_id);
 void set_root_num(int64_t table_id, pagenum_t root_num);

@@ -2,13 +2,11 @@
 
 table_t tables[NUM_TABLES];
 
-// Open existing table file or create one if not existed
 int64_t file_open_table_file(const char* pathname) {
 	int fd;
-	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0666);
-	// file exists
+	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0644);
 	if (fd < 0 && errno == EEXIST) {
-		fd = open(pathname, O_RDWR|O_SYNC, 0666);
+		fd = open(pathname, O_RDWR|O_SYNC, 0644);
 		if (fd < 0) {
 			perror("Failure to open table file(open error)");
 			exit(EXIT_FAILURE);
@@ -18,7 +16,6 @@ int64_t file_open_table_file(const char* pathname) {
 		perror("Failure to open table file(creat error)");
 		exit(EXIT_FAILURE);
 	}
-	// file not exists
 	else {
 		page_t header;
 		header.free_num = INITIAL_PAGENUM - 1;
@@ -42,14 +39,25 @@ int64_t file_open_table_file(const char* pathname) {
 			fsync(fd);
 		}
 	}
-	// add file into hash table
 	table_t new_table;
 	strcpy(new_table.pathname, pathname);
 	new_table.fd = fd;
-	return add_table(new_table, tables);
+	int64_t table_id = 0;
+	int i;
+	for (i = 0; i < strlen(new_table.pathname); i++)
+		table_id += new_table.pathname[i];
+	i = table_id % NUM_TABLES;
+	while (!EMPTY(tables[i])) {
+		if (EQUAL(tables[i], new_table)) {
+			close(fd);
+			return -1;
+		}
+		i = (++table_id) % NUM_TABLES;
+	}
+	tables[i] = new_table;
+	return table_id;
 }
 
-// Allocate an on-disk page from the free page list
 pagenum_t file_alloc_page(int64_t table_id) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
@@ -62,7 +70,6 @@ pagenum_t file_alloc_page(int64_t table_id) {
 	}
 
 	pagenum_t num;
-	// free page not exists
 	if (header.free_num == 0) {
 		num = header.num_pages;
 
@@ -88,7 +95,6 @@ pagenum_t file_alloc_page(int64_t table_id) {
 		header.free_num = tmp_num - 1;
 		header.num_pages = tmp_num;
 	}
-	// allocate page
 	num = header.free_num;
 
 	page_t freepg;
@@ -135,7 +141,6 @@ pagenum_t file_double_page(int64_t table_id, uint64_t num_pages) {
 	return new_num;
 }
 
-// Free an on-disk page to the free page list
 void file_free_page(int64_t table_id, pagenum_t pagenum) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
@@ -165,7 +170,6 @@ void file_free_page(int64_t table_id, pagenum_t pagenum) {
 	fsync(fd);
 }
 
-// Read an on-disk page into the in-memory page structure(dest)
 void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
@@ -177,7 +181,6 @@ void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest) {
 	}
 }
 
-// Write an in-memory page(src) to the on-disk page
 void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
@@ -190,7 +193,6 @@ void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src) {
 	fsync(fd);
 }
 
-// Close all table files
 void file_close_table_file() {
 	int i;
 	for (i = 0; i < NUM_TABLES; i++) {

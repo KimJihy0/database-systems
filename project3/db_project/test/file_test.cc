@@ -1,5 +1,4 @@
-// #include "../db/include/bpt.h"
-// #include "../db/include/dbms.h"
+// #include "file.h"
 // #include <gtest/gtest.h>
 // #include <string>
 // #include <iostream>
@@ -20,20 +19,19 @@
 //     int fd;                                 // file descriptor
 //     std::string pathname = "init_test.db";  // customize it to your test file
 
-//     init_db(1);
 //     // Open a database file
-//     fd = open_table((char*)pathname.c_str());
+//     fd = file_open_database_file(pathname.c_str());
 
 //     // Check if the file is opened
 //     ASSERT_TRUE(fd >= 0);  // change the condition to your design's behavior
 
 //     // Check the size of the initial file
 //     int file_size;
-//     file_size = lseek(tables[fd % NUM_TABLES].fd, 0, SEEK_END);
+//     file_size = lseek(fd, 0, SEEK_END);
 //     EXPECT_EQ(file_size, INITIAL_FILESIZE);
 
 //     // Close all database files
-//     shutdown_db();
+//     file_close_database_file();
 
 //     // Remove the db file
 //     int is_removed = remove(pathname.c_str());
@@ -51,14 +49,11 @@
 //     * TearDown(). The official document says that the former is actually
 //     * perferred due to some reasons. Checkout the document for the difference
 //     */
-//     FileTest() { 
-//         init_db(300);
-//         fd = open_table((char*)pathname.c_str());
-//     }
+//     FileTest() { fd = file_open_database_file(pathname.c_str()); }
 
 //     ~FileTest() {
 //         if (fd >= 0) {
-//             shutdown_db();
+//             file_close_database_file();
 // 			remove(pathname.c_str());
 //         }
 //     }
@@ -76,25 +71,26 @@
 //     pagenum_t allocated_page, freed_page;
 
 //     // Allocate the pages
-//     allocated_page = alloc_page(fd);
-//     freed_page = alloc_page(fd);
+//     allocated_page = file_alloc_page(fd);
+//     freed_page = file_alloc_page(fd);
 
 //     // Free one page
-//     free_page(fd, freed_page);
+//     file_free_page(fd, freed_page);
 
 //     // Traverse the free page list and check the existence of the freed/allocated
 //     // pages. You might need to open a few APIs soley for testing.
 //     page_t header;
-//     read_page(fd, 0, &header);
+//     lseek(fd, 0, SEEK_SET);
+//     read(fd, &header, PAGE_SIZE);
 //     EXPECT_EQ(header.free_num, 2558);
 
 //     for (int i = 0; i < 2559; i++) {
-//         alloc_page(fd);
+//         file_alloc_page(fd);
 //     }
 
-//     read_page(fd, 0, &header);
+//     lseek(fd, 0, SEEK_SET);
+//     read(fd, &header, PAGE_SIZE);
 //     EXPECT_EQ(header.free_num, 5118);
-//     EXPECT_EQ(header.num_pages, 5120);
 // }
 
 // /*
@@ -102,20 +98,20 @@
 //  * 1. Write/Read a page with some random content and check if the data matches
 //  */
 // TEST_F(FileTest, CheckReadWriteOperation) {
-//    	// pagenum_t pagenum;
-//     // page_t src, dest;
+//    	pagenum_t pagenum;
+//     page_t src, dest;
 
-//     // char a[4096];
-//     // std::fill_n(a, 4096, 'a');
-//     // strcpy(src.data, a);
+//     char a[4096];
+//     std::fill_n(a, 4096, 'a');
+//     strcpy(src.data, a);
 
-// 	// pagenum = file_alloc_page(fd);
+// 	pagenum = file_alloc_page(fd);
 
-//     // file_write_page(fd, pagenum, &src);
+//     file_write_page(fd, pagenum, &src);
 
-//     // file_read_page(fd, pagenum, &dest);
+//     file_read_page(fd, pagenum, &dest);
 
-//     // for (int i = 0; i < 4096; i++) {
-//     //     EXPECT_EQ(a[i], dest.data[i]);
-//     // }
+//     for (int i = 0; i < 4096; i++) {
+//         EXPECT_EQ(a[i], dest.data[i]);
+//     }
 // }

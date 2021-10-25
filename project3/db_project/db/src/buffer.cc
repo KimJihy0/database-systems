@@ -21,8 +21,7 @@ int get_buffer_idx(int64_t table_id, pagenum_t page_num) {
     int i;
     for (i = 0; i < buf_size; i++)
         if (buffers[i] != NULL &&
-            buffers[i]->table_id == table_id &&
-            buffers[i]->page_num == page_num)
+            buffers[i]->table_id == table_id && buffers[i]->page_num == page_num)
             return i;
     return -1;
 }
@@ -42,17 +41,12 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
             }
         }
         if (i == buf_size) {
-            // printf("replacement");
             for (victim = buffers[get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
                 if (victim->is_pinned == 0) break;
             }
-            if (victim == NULL) {
-                printf("all buffers are in-used.\n");
-                return -1;
-            }
+            if (victim == NULL) return -1;
             buffer_idx = get_buffer_idx(victim->table_id, victim->page_num);
             if (buffers[buffer_idx]->is_dirty) {
-                // printf(" / flush");
                 file_write_page(buffers[buffer_idx]->table_id,
                                 buffers[buffer_idx]->page_num,
                                 &(buffers[buffer_idx]->frame));
@@ -83,12 +77,16 @@ int read_buffer(int64_t table_id, pagenum_t page_num) {
     return buffer_idx;
 }
 
+// void unpin(int idx) { if (idx != -1) buffers[idx]->is_pinned--; }
+
 pagenum_t buffer_alloc_page(int64_t table_id) {
     return file_alloc_page(table_id);
+    //header만 바꾸면됨
 }
 
 void buffer_free_page(int64_t table_id, pagenum_t page_num) {
     file_free_page(table_id, page_num);
+    
 }
 
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
@@ -109,46 +107,50 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t** src_page) 
     buffer_idx = read_buffer(table_id, page_num);
     if (buffer_idx != -1) {
         buffers[buffer_idx]->is_dirty = 1;
+        buffers[buffer_idx]->is_pinned--;
     }
     else {
         file_write_page(table_id, page_num, *src_page);
     }
 }
 
-// void file_close_table_file();
-
 pagenum_t get_root_num(int64_t table_id) {
     page_t* header;
-    int header_idx = buffer_read_page(table_id, 0, &header);
+    int header_idx;
+    header_idx = buffer_read_page(table_id, 0, &header);
     pagenum_t root_num = header->root_num;
-    if (header_idx != -1) buffers[header_idx]->is_pinned--;
+    unpin(header_idx);
     return root_num;
 }
 
 void set_root_num(int64_t table_id, pagenum_t root_num) {
     page_t* header;
-    int header_idx = buffer_read_page(table_id, 0, &header);
+    int header_idx;
+    header_idx = buffer_read_page(table_id, 0, &header);
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
-    if (header_idx != -1) buffers[header_idx]->is_pinned--;
 }
 
 /* ---To do---
  * Find에서 Input/ouput error 이유찾기.
- * doubling시 버퍼처리
- * replacement시 pin?
- * pin 위치 index -> buffer로 이동
  * 0644
- * 구조(page.h, hash.h, hash.cc)
- * file.h specification 변경금지
- * linkedlist null 해줘야되나??
+ * alloc / free 실시간동기화
+ * NUM_KEYS = 10000, NUM_BUFS = 100
+ * merge에서 swap-> idx 설정 틀릴 수 있음
+ * delete (projec2랑 비교하면서 해야됨)
+ * 파일 경로 ? (e.g. "/home/table1")
  * 
  * ---Done---
+ * file_open_table_file() 안에서 hash 처리
+ * replacement시 pin?
+ * pin, unpin 위치 index -> buffer로 이동
+ * 구조(page.h, hash.h, hash.cc)
+ * file.h specification 변경금지
  * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
  * all buffers are in use. 처리
  * 지역변수 -> 동적할당(필요없음)
  * 
- * ---Recent Modification
+ * ---Recent Modification---
  * doubling 추가
  * read_buffer에 합침 (빈버퍼 찾았을 때랑 victim 찾았을 때)
  * buffer_write_page 수정 (인자, 내용)

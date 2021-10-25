@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <random>
 
-#define NUM_KEYS 1000
-#define NUM_BUFS 3
+#define NUM_KEYS 10000
+#define NUM_BUFS 200
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -20,34 +20,54 @@ void print_tree(int64_t table_id);
 int path_to_root_from_disk(int64_t table_id, pagenum_t child_num);
 void print_tree_from_disk(int64_t table_id);
 int64_t free_num(int64_t table_id);
-// void print_buffers();
+void print_buffers();
 
 char* val(int key);
 int size();
 int size(int key);
 
-#if 1
-void test_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
 
+#if 0
+void test1_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
 	file_read_page(table_id, page_num, *dest_page);
+}
+void test2_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
+	*dest_page = &(buffers[0]->frame);
 }
 int main(int argc, char** argv) {
 	init_db(200);
 	int64_t table_id = open_table((char*)"test_table");
 
-	page_t* header;
-	header = (page_t*)malloc(sizeof(page_t));
+	// page_t* header;
+	// header = (page_t*)malloc(sizeof(page_t));
 	
-	test_read_page(table_id, 0, &header);
+	// test1_read_page(table_id, 0, &header);
 	
-	printf("header->free_num: %ld\n", header->free_num);
-	printf("header->num_pages: %ld\n", header->num_pages);
-	printf("header->root_num: %ld\n", header->root_num);
+	// printf("header->free_num: %ld\n", header->free_num);
+	// printf("header->num_pages: %ld\n", header->num_pages);
+	// printf("header->root_num: %ld\n", header->root_num);
+
+	buffers[0] = (buffer_t*)malloc(sizeof(buffer_t));
+	file_read_page(table_id, 0, &(buffers[0]->frame));
+
+	page_t* leaf;
+	leaf = (page_t*)malloc(sizeof(page_t));
+	test2_read_page(table_id, 0, &leaf);
+	
+
+	printf("leaf->free_num: %ld\n", leaf->free_num);
+	printf("leaf->num_pages: %ld\n", leaf->num_pages);
+	printf("leaf->root_num: %ld\n", leaf->root_num);
+
+	leaf->free_num = 1252;
+
+	printf("\n");
+	printf("buffers[0]->free_num: %ld\n", buffers[0]->frame.free_num);
 		
 }
 #endif
 
-#if 0
+#if 1
 int main(int argc, char** argv) {
 	vector<int> keys;
 	for (int i = 0; i < NUM_KEYS; i++) {
@@ -77,7 +97,7 @@ int main(int argc, char** argv) {
 		memset(value, 0x00, 112);
 		val_size = 0;
 		// printf("find %4d\n", i);
-		if (db_find(table_id, i, value, &val_size) != 0) goto func_exit;
+		if(db_find(table_id, i, value, &val_size) != 0) goto func_exit;
 		// else if (size(i) != val_size ||
 		// 		 val(i) != std::string(value, val_size)) {
 		// 	printf("value dismatched\n");
@@ -86,7 +106,6 @@ int main(int argc, char** argv) {
 	}
 	printf("[FIND END]\n\n");
 
-	print_tree(table_id);
 	goto func_exit;
 
 	printf("[DELETE START]\n");
@@ -95,7 +114,7 @@ int main(int argc, char** argv) {
 	}
 	printf("[DELETE END]\n\n");
 
-	print_tree(table_id);
+	goto func_exit;
 
 	printf("[FIND START AGAIN]\n");
 	for (const auto& i : keys) {
@@ -108,6 +127,7 @@ int main(int argc, char** argv) {
 	printf("[TEST END]\n\n");
 	
 	func_exit:
+	print_tree(table_id);
 	printf("[SHUTDOWN START]\n");
 	if (shutdown_db() != 0) {
 		return 0;
@@ -384,6 +404,28 @@ void print_tree_from_disk(int64_t table_id) {
 				queue.push(p.entries[i].child);
 		}
 		printf("| ");
+	}
+	printf("\n");
+}
+
+void print_buffers() {
+	int i;
+	printf("\n");
+	for (i = 0; i < buf_size; i++) {
+		if (buffers[i] != NULL) {
+			printf("---buffer%2d---\n", i);
+            // printf("parent: %ld\n", buffers[i]->frame.parent);
+			// printf("table_id: %ld\n", buffers[i]->table_id);
+			printf("page_num: %ld\n", buffers[i]->page_num);
+			// printf("is_dirty: %d\n", buffers[i]->is_dirty);
+			printf("is_pinned: %d\n", buffers[i]->is_pinned);
+			// if (buffers[i]->next_LRU != NULL) printf("next_LRU: %ld\n", buffers[i]->next_LRU->page_num);
+			// else printf("next LRU: NULL\n");
+			// if (buffers[i]->prev_LRU != NULL) printf("prev_LRU: %ld\n", buffers[i]->prev_LRU->page_num);
+			// else printf("prev LRU: NULL\n");
+			printf("\n");
+		}
+		else break;
 	}
 	printf("\n");
 }

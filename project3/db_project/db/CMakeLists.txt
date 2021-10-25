@@ -4,7 +4,6 @@ set(DB_SOURCES
   ${DB_SOURCE_DIR}/buffer.cc
   ${DB_SOURCE_DIR}/bpt.cc
   ${DB_SOURCE_DIR}/file.cc
-  ${DB_SOURCE_DIR}/hash.cc
   )
 
 # Headers
@@ -13,8 +12,6 @@ set(DB_HEADERS
   ${DB_HEADER_DIR}/buffer.h
   ${DB_HEADER_DIR}/bpt.h
   ${DB_HEADER_DIR}/file.h
-  ${DB_HEADER_DIR}/hash.h
-  ${DB_HEADER_DIR}/page.h
   )
 
 add_library(db STATIC ${DB_HEADERS} ${DB_SOURCES})
