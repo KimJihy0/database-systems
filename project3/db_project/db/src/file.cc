@@ -2,7 +2,7 @@
 
 table_t tables[NUM_TABLES];
 
-int64_t file_open_table_file(const char* pathname) {
+int64_t file_open_table_file(const char * pathname) {
 	int fd;
 	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0644);
 	if (fd < 0 && errno == EEXIST) {
@@ -22,7 +22,7 @@ int64_t file_open_table_file(const char* pathname) {
 		header.num_pages = INITIAL_PAGENUM;
 		header.root_num = 0;
 		lseek(fd, 0, SEEK_SET);
-		if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+		if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE) {
 			perror("Failure to open table file(write error)");
 			exit(EXIT_FAILURE);
 		}
@@ -32,7 +32,7 @@ int64_t file_open_table_file(const char* pathname) {
 		int i;
 		for (i = 1; i < INITIAL_PAGENUM; i++) {
 			freepg.next_frpg = i - 1;
-			if (write(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
+			if (write(fd, &freepg, PAGE_SIZE) != PAGE_SIZE) {
 				perror("Failure to open table file(write error)");
 				exit(EXIT_FAILURE);
 			}
@@ -44,11 +44,11 @@ int64_t file_open_table_file(const char* pathname) {
 	new_table.fd = fd;
 	int64_t table_id = 0;
 	int i;
-	for (i = 0; i < strlen(new_table.pathname); i++)
-		table_id += new_table.pathname[i];
+	for (i = 0; i < strlen(pathname); i++)
+		table_id += pathname[i];
 	i = table_id % NUM_TABLES;
-	while (!EMPTY(tables[i])) {
-		if (EQUAL(tables[i], new_table)) {
+	while (strlen(tables[i].pathname) != 0) {
+        if (!strcmp(tables[i].pathname, pathname)) {
 			close(fd);
 			return -1;
 		}
@@ -64,7 +64,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 
 	page_t header;
 	lseek(fd, 0, SEEK_SET);
-	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+	if (read(fd, &header, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to alloc page(read error)");
 		exit(EXIT_FAILURE);
 	}
@@ -76,7 +76,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 		page_t tmp_page;
 		tmp_page.next_frpg = 0;
 		lseek(fd, num * PAGE_SIZE, SEEK_SET);
-		if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
+		if (write(fd, &tmp_page, PAGE_SIZE) != PAGE_SIZE) {
 			perror("Failure to alloc page(write error)");
 			exit(EXIT_FAILURE);
 		}
@@ -85,7 +85,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 		pagenum_t tmp_num;
 		for(tmp_num = num + 1; tmp_num < 2 * num; tmp_num++) {
 			tmp_page.next_frpg = tmp_num - 1;
-			if (write(fd, &tmp_page, PAGE_SIZE) < PAGE_SIZE) {
+			if (write(fd, &tmp_page, PAGE_SIZE) != PAGE_SIZE) {
 				perror("Failure to alloc page(write error)");
 				exit(EXIT_FAILURE);
 			}
@@ -99,14 +99,14 @@ pagenum_t file_alloc_page(int64_t table_id) {
 
 	page_t freepg;
 	lseek(fd, num * PAGE_SIZE, SEEK_SET);
-	if (read(fd, &freepg, PAGE_SIZE) < PAGE_SIZE) {
+	if (read(fd, &freepg, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to alloc page(read error)");
 		exit(EXIT_FAILURE);
 	}
 	
 	header.free_num = freepg.next_frpg;
 	lseek(fd, 0, SEEK_SET);
-	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+	if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to alloc page(write error)");
 		exit(EXIT_FAILURE);
 	}
@@ -121,7 +121,7 @@ void file_free_page(int64_t table_id, pagenum_t pagenum) {
 
 	page_t header;
 	lseek(fd, 0, SEEK_SET);
-	if (read(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+	if (read(fd, &header, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to free page(read error)");
 		exit(EXIT_FAILURE);
 	}
@@ -129,7 +129,7 @@ void file_free_page(int64_t table_id, pagenum_t pagenum) {
 	page_t tmp;
 	tmp.next_frpg = header.free_num;
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
-	if (write(fd, &tmp, PAGE_SIZE) < PAGE_SIZE) {
+	if (write(fd, &tmp, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to free page(write error)");
 		exit(EXIT_FAILURE);
 	}
@@ -137,30 +137,30 @@ void file_free_page(int64_t table_id, pagenum_t pagenum) {
 
 	header.free_num = pagenum;
 	lseek(fd, 0, SEEK_SET);
-	if (write(fd, &header, PAGE_SIZE) < PAGE_SIZE) {
+	if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to free page(write error)");
 		exit(EXIT_FAILURE);
 	}
 	fsync(fd);
 }
 
-void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest) {
+void file_read_page(int64_t table_id, pagenum_t pagenum, page_t * dest) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
 
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
-	if (read(fd, dest, PAGE_SIZE) < PAGE_SIZE) {
+	if (read(fd, dest, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to read page(read error)");
 		exit(EXIT_FAILURE);
 	}
 }
 
-void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src) {
+void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t * src) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;
 
 	lseek(fd, pagenum * PAGE_SIZE, SEEK_SET);
-	if (write(fd, src, PAGE_SIZE) < PAGE_SIZE) {
+	if (write(fd, src, PAGE_SIZE) != PAGE_SIZE) {
 		perror("Failure to write page(write error)");
 		exit(EXIT_FAILURE);
 	}
@@ -170,7 +170,7 @@ void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src) {
 void file_close_table_file() {
 	int i;
 	for (i = 0; i < NUM_TABLES; i++) {
-		if (!EMPTY(tables[i]))
+        if (strlen(tables[i].pathname) != 0)
 			close(tables[i].fd);
 	}
 }

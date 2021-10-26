@@ -7,7 +7,7 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 400
+#define NUM_BUFS 100
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -21,7 +21,6 @@ void print_tree(int64_t table_id);
 int path_to_root_from_disk(int64_t table_id, pagenum_t child_num);
 void print_tree_from_disk(int64_t table_id);
 int64_t free_num(int64_t table_id);
-// void print_buffers();
 
 char* val(int key);
 int size();
@@ -125,8 +124,8 @@ int main(int argc, char** argv) {
 	}
 	printf("[FIND END]\n\n");
 
-    print_tree(table_id);
-    printf("\n");
+    // print_tree(table_id);
+    // printf("\n");
 
 	printf("[DELETE START]\n");
     int check;
@@ -161,7 +160,7 @@ int main(int argc, char** argv) {
 	if (shutdown_db() != 0) {
 		return 0;
 	}
-	printf("[SHUTDOWN END]\n\n");
+	printf("[SHUTDOWN END]\n");
 	return 0;
 }
 #endif
@@ -366,16 +365,10 @@ int path_to_root(int64_t table_id, pagenum_t child_num) {
 	pagenum_t c_num = child_num;
 	page_t* c;
 	int c_idx = buffer_read_page(table_id, c_num, &c);
-	#if verbose
-	if (c_idx != -1) buffers[c_idx]->is_pinned++;
-	#endif
 	while (c->parent != 0) {
 		c_num = c->parent;
 		if (c_idx != -1) buffers[c_idx]->is_pinned--;
 		c_idx = buffer_read_page(table_id, c_num, &c);
-		#if verbose
-		if (c_idx != -1) buffers[c_idx]->is_pinned++;
-		#endif
 		length++;
 	}
 	if (c_idx != -1) buffers[c_idx]->is_pinned--;
@@ -400,13 +393,7 @@ void print_tree(int64_t table_id) {
 		p_pgnum = queue.front();
 		queue.pop();
 		p_idx = buffer_read_page(table_id, p_pgnum, &p);
-		#if verbose
-		if (p_idx != -1) buffers[p_idx]->is_pinned++;
-		#endif
 		parent_idx = buffer_read_page(table_id, p->parent, &parent);
-		#if verbose
-		if (parent_idx != -1) buffers[parent_idx]->is_pinned++;
-		#endif
 
 		if (p->parent != 0 && p_pgnum == parent->left_child) {
 			new_rank = path_to_root(table_id, p_pgnum);

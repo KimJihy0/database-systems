@@ -12,10 +12,7 @@
 #define PAGE_SIZE (4 * 1024)							// 4KiB
 #define INITIAL_FILESIZE (10 * 1024 * 1024)				// 10MiB
 #define INITIAL_PAGENUM (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
-
 #define NUM_TABLES 31
-#define EMPTY(t) (strlen(t.pathname) == 0)
-#define EQUAL(t1,t2) (!strcmp(t1.pathname, t2.pathname))
 
 typedef uint64_t pagenum_t;
 
@@ -66,11 +63,11 @@ struct table_t {
 
 extern table_t tables[];
 
-int64_t file_open_table_file(const char* pathname);
+int64_t file_open_table_file(const char * pathname);
 pagenum_t file_alloc_page(int64_t table_id);
 void file_free_page(int64_t table_id, pagenum_t pagenum);
-void file_read_page(int64_t table_id, pagenum_t pagenum, page_t* dest);
-void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t* src);
+void file_read_page(int64_t table_id, pagenum_t pagenum, page_t * dest);
+void file_write_page(int64_t table_id, pagenum_t pagenum, const page_t * src);
 void file_close_table_file();
 
-#endif	// DB_FILE_H_
+#endif
