@@ -7,7 +7,7 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 100
+#define NUM_BUFS 400
 using namespace std;
 
 void print_leaves(int64_t table_id);
@@ -31,13 +31,26 @@ int size(int key);
 int main(int argc, char** argv) {
     init_db(NUM_BUFS);
     int64_t table_id = open_table((char*)"table0");
+    pagenum_t alloc_page, free_page;
 
-    for (int i = 10; i < 25; i++)
-        db_delete(table_id, i);
+    alloc_page = buffer_alloc_page(table_id);
+    free_page = buffer_alloc_page(table_id);;
 
-    print_all(table_id);
+    buffer_free_page(table_id, free_page);
 
-    shutdown_db();
+    page_t* header;
+    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    printf("header->free_num(2558) : %ld\n", header->free_num);
+    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
+
+    for (int i = 0; i < 2559; i++) {
+        buffer_alloc_page(table_id);
+    }
+
+    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    printf("header->free_num(5118) : %ld\n", header->free_num);
+
+    return 0;
 }
 #endif
 
@@ -46,11 +59,30 @@ int main(int argc, char** argv) {
     init_db(NUM_BUFS);
     int64_t table_id = open_table((char*)"table0");
 
-    print_all_from_disk(table_id);
-    print_pgnum_from_disk(table_id, 2556);
-    print_pgnum_from_disk(table_id, 2558);
+    for (int i = 10; i < 25; i++)
+        db_delete(table_id, i);
+
+    print_all(table_id);
 
     shutdown_db();
+    
+    return 0;
+}
+#endif
+
+#if 0
+int main(int argc, char** argv) {
+    init_db(NUM_BUFS);
+    int64_t table_id = open_table((char*)"table0");
+
+    // print_all_from_disk(table_id);
+    print_pgnum_from_disk(table_id, 2239);
+    print_pgnum_from_disk(table_id, 2519);
+    print_pgnum_from_disk(table_id, 2375);
+
+    shutdown_db();
+
+    return 0;
 }
 #endif
 
@@ -97,9 +129,15 @@ int main(int argc, char** argv) {
     printf("\n");
 
 	printf("[DELETE START]\n");
+    int check;
 	for (const auto& i : keys) {
         // printf("\n\ndelete %4d\n", i);
-		if (db_delete(table_id, i) != 0) goto func_exit;
+        check = db_delete(table_id, i);
+        if (check != 0) {
+            printf("\ndb_delete(%d) = %d\n\n", i, check);
+            goto func_exit;
+        }
+		// if (db_delete(table_id, i) != 0) goto func_exit;
         // print_all(table_id);
         // print_tree(table_id);
 	}
@@ -166,6 +204,7 @@ int main(int argc, char** argv) {
 	printf("\n");
 	printf("buffers[0]->free_num: %ld\n", buffers[0]->frame.free_num);
 		
+    return 0;
 }
 #endif
 

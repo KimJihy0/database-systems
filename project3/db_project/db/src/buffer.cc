@@ -163,13 +163,14 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
  * Find에서 Input/ouput error 이유찾기.
  * 0644
  * NUM_KEYS = 10000, NUM_BUFS = 100
- * merge에서 swap-> idx 설정 틀릴 수 있음
  * 파일 경로 ? (e.g. "/home/table1")
  * unpin() 함수풀기
+ * insert_into_page_split() ENTRY_ORDER + 1 -> ENTRY_ORDER
  * 
  * ************************** parent 수정 어디서 안되는지 확인 ; 이거때메 오류남 **************************
  * 
  * ---Done---
+ * merge에서 swap-> idx 설정 틀릴 수 있음
  * alloc / free 실시간동기화
  * delete (projec2랑 비교하면서 해야됨)
  * file_open_table_file() 안에서 hash 처리
