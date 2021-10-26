@@ -115,32 +115,6 @@ pagenum_t file_alloc_page(int64_t table_id) {
 	return num;
 }
 
-pagenum_t file_double_page(int64_t table_id, uint64_t num_pages) {
-	int fd;
-	fd = tables[table_id % NUM_TABLES].fd;
-
-	page_t new_page;
-	new_page.next_frpg = 0;
-	lseek(fd, num_pages * PAGE_SIZE, SEEK_SET);
-	if (write(fd, &new_page, PAGE_SIZE) < PAGE_SIZE) {
-		perror("Failure to alloc page(write error)");
-		exit(EXIT_FAILURE);
-	}
-	fsync(fd);
-
-	pagenum_t new_num;
-	for(new_num = num_pages + 1; new_num < 2 * num_pages; new_num++) {
-		new_page.next_frpg = new_num - 1;
-		if (write(fd, &new_page, PAGE_SIZE) < PAGE_SIZE) {
-			perror("Failure to alloc page(write error)");
-			exit(EXIT_FAILURE);
-		}
-		fsync(fd);
-	}
-
-	return new_num;
-}
-
 void file_free_page(int64_t table_id, pagenum_t pagenum) {
 	int fd;
 	fd = tables[table_id % NUM_TABLES].fd;

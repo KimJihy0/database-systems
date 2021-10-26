@@ -3,8 +3,6 @@
 
 #include "file.h"
 
-#define unpin(i) if(i!=-1)buffers[i]->is_pinned--; 
-
 struct buffer_t {
     page_t frame;
     int64_t table_id;

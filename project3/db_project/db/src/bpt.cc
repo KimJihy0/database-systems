@@ -1,5 +1,29 @@
 #include "../include/bpt.h"
 
+#define verbose 0
+
+void print_buffers() {
+	int i;
+	printf("\n");
+	for (i = 0; i < buf_size; i++) {
+		if (buffers[i] != NULL) {
+			printf("---buffer%2d---\n", i);
+            // printf("parent: %ld\n", buffers[i]->frame.parent);
+			// printf("table_id: %ld\n", buffers[i]->table_id);
+			printf("page_num: %ld\n", buffers[i]->page_num);
+			// printf("is_dirty: %d\n", buffers[i]->is_dirty);
+			printf("is_pinned: %d\n", buffers[i]->is_pinned);
+			// if (buffers[i]->next_LRU != NULL) printf("next_LRU: %ld\n", buffers[i]->next_LRU->page_num);
+			// else printf("next LRU: NULL\n");
+			// if (buffers[i]->prev_LRU != NULL) printf("prev_LRU: %ld\n", buffers[i]->prev_LRU->page_num);
+			// else printf("prev LRU: NULL\n");
+			printf("\n");
+		}
+		else break;
+	}
+	printf("\n");
+}
+
 // DBMS
 
 int init_db(int num_buf) {
@@ -39,7 +63,7 @@ int64_t open_table(char* pathname) {
 int db_find(int64_t table_id, int64_t key,
             char* ret_val = NULL, uint16_t* val_size = NULL) {
     pagenum_t p_pgnum;
-    page_t* p;
+    page_t * p;
     int p_buffer_idx;
     int i;
     p_pgnum = find_leaf(table_id, key);
@@ -49,18 +73,20 @@ int db_find(int64_t table_id, int64_t key,
         if (p->slots[i].key == key) break;
     }
     if (i == p->num_keys || ret_val == NULL || val_size == NULL) {
-        unpin(p_buffer_idx);
+        // unpin(p_buffer_idx);
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         return (i == p->num_keys) ? -1 : 1;
     }
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
-    unpin(p_buffer_idx);
+    // unpin(p_buffer_idx);
+    if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
     return 0;
 }
 
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
     pagenum_t p_pgnum;
-    page_t* p;
+    page_t * p;
     int p_buffer_idx;
     int i;
     p_pgnum = get_root_num(table_id);
@@ -73,10 +99,12 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
             else break;
         }
         p_pgnum = i ? p->entries[i - 1].child : p->left_child;
-        unpin(p_buffer_idx);
+        // unpin(p_buffer_idx);
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     }
-    unpin(p_buffer_idx);
+    // unpin(p_buffer_idx);
+    if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
     return p_pgnum;
 }
 
@@ -84,7 +112,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
 
 int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     pagenum_t leaf_pgnum;
-    page_t* leaf;
+    page_t * leaf;
     int leaf_buffer_idx;
     int free_space;
 
@@ -99,7 +127,8 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
     leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
     free_space = leaf->free_space;
-    unpin(leaf_buffer_idx);
+    // unpin(leaf_buffer_idx);
+    if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
 
     if (free_space >= SLOT_SIZE + val_size) {
         insert_into_leaf(table_id, leaf_pgnum, key, value, val_size);
@@ -113,7 +142,7 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 
 void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
                       int64_t key, char* value, uint16_t val_size) {
-    page_t* leaf;
+    page_t * leaf;
     int leaf_buffer_idx;
     int i, insertion_index;
     uint16_t offset;
@@ -145,7 +174,7 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
 void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
                             int64_t key, char* value, uint16_t val_size) {
     pagenum_t new_pgnum;
-    page_t* leaf, * new_leaf;
+    page_t * leaf, * new_leaf;
     int leaf_buffer_idx, new_buffer_idx;
     int i, j, split, insertion_index, num_keys, total_size;
     int64_t new_key;
@@ -225,13 +254,14 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
 void insert_into_parent(int64_t table_id,
                         pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum) {
     pagenum_t parent_pgnum;
-    page_t* left, * parent;
+    page_t * left, * parent;
     int left_buffer_idx, parent_buffer_idx;
     int left_index, num_keys;
 
     left_buffer_idx = buffer_read_page(table_id, left_pgnum, &left);
     parent_pgnum = left->parent;
-    unpin(left_buffer_idx);
+    // unpin(left_buffer_idx);
+    if (left_buffer_idx != -1) buffers[left_buffer_idx]->is_pinned--;
 
     if (parent_pgnum == 0) {
         insert_into_new_root(table_id, left_pgnum, key, right_pgnum);
@@ -242,7 +272,8 @@ void insert_into_parent(int64_t table_id,
 
     parent_buffer_idx = buffer_read_page(table_id, parent_pgnum, &parent);
     num_keys = parent->num_keys;
-    unpin(parent_buffer_idx);
+    // unpin(parent_buffer_idx);
+    if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
     
     if (num_keys < ENTRY_ORDER - 1) {
         insert_into_page(table_id, parent_pgnum, left_index, key, right_pgnum);
@@ -254,7 +285,7 @@ void insert_into_parent(int64_t table_id,
 
 void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
                       int left_index, int64_t key, pagenum_t right_pgnum) {
-    page_t* p;
+    page_t * p;
     int p_buffer_idx;
     int i;
 
@@ -274,7 +305,7 @@ void insert_into_page(int64_t table_id, pagenum_t p_pgnum,
 void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
                             int left_index, int64_t key, pagenum_t right_pgnum) {
     pagenum_t new_pgnum;
-    page_t* old_page, * new_page, * child;
+    page_t * old_page, * new_page, * child;
     int old_buffer_idx, new_buffer_idx, child_buffer_idx;
     int i, j, split;
     int64_t k_prime;
@@ -333,7 +364,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
 
 void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     pagenum_t root_pgnum;
-    page_t* root;
+    page_t * root;
     int root_buffer_idx;
 
     root_pgnum = make_leaf(table_id);
@@ -355,7 +386,7 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 void insert_into_new_root(int64_t table_id,
                           pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum) {
     pagenum_t root_pgnum;
-    page_t* left, * right, * root;
+    page_t * left, * right, * root;
     int left_buffer_idx, right_buffer_idx, root_buffer_idx;
     
     root_pgnum = make_page(table_id);
@@ -380,7 +411,7 @@ void insert_into_new_root(int64_t table_id,
 
 pagenum_t make_leaf(int64_t table_id) {
     pagenum_t new_pgnum;
-    page_t* new_leaf;
+    page_t * new_leaf;
     int new_buffer_idx;
     new_pgnum = make_page(table_id);
     new_buffer_idx = buffer_read_page(table_id, new_pgnum, &new_leaf);
@@ -393,7 +424,7 @@ pagenum_t make_leaf(int64_t table_id) {
 
 pagenum_t make_page(int64_t table_id) {
     pagenum_t new_pgnum;
-    page_t* new_page;
+    page_t * new_page;
     int new_buffer_idx;
     new_pgnum = buffer_alloc_page(table_id);
     new_buffer_idx = buffer_read_page(table_id, new_pgnum, &new_page);
@@ -405,19 +436,21 @@ pagenum_t make_page(int64_t table_id) {
 }
 
 int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnum) {
-    page_t* parent;
+    page_t * parent;
     int parent_buffer_idx;
     int left_index;
     parent_buffer_idx = buffer_read_page(table_id, parent_pgnum, &parent);
     left_index = 0;
     if (parent->left_child == left_pgnum) {
-        unpin(parent_buffer_idx);
+        // unpin(parent_buffer_idx);
+        if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
         return left_index;
     }
     while (parent->entries[left_index].child != left_pgnum) {
         left_index++;
     }
-    unpin(parent_buffer_idx);
+    // unpin(parent_buffer_idx);
+    if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
     return ++left_index;
 }
 
@@ -425,31 +458,44 @@ int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnu
 
 int db_delete(int64_t table_id, int64_t key) {
     pagenum_t leaf_pgnum, sibling_pgnum;
-    page_t* leaf, *sibling, *parent;
-    int leaf_idx, sibling_idx, parent_idx;
+    page_t * leaf, * sibling, * parent;
+    int leaf_buffer_idx, sibling_buffer_idx, parent_buffer_idx;
     int sibling_index, k_prime_index, leaf_free_space, sibling_free_space;
     int64_t k_prime;
+    #if verbose
+    printf("---db_delete() start---\n");
+    print_buffers();
+    #endif
 
     if (db_find(table_id, key) == -1) return -1;
     leaf_pgnum = find_leaf(table_id, key);
 
     delete_from_leaf(table_id, leaf_pgnum, key);
 
-    leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
 
     if (leaf->parent == 0) {
-        if (leaf->num_keys > 0) return 0;
+        if (leaf->num_keys > 0) {
+            // unpin(leaf_buffer_idx);
+            if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
+            return 0;
+        }
+        // unpin(leaf_buffer_idx);
+        if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
         end_tree(table_id, leaf_pgnum);
         return 0;
     }
 
     if (leaf->free_space < THRESHOLD) {
+        // unpin(leaf_buffer_idx);
+        if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
         return 0;
     }
 
+    parent_buffer_idx = buffer_read_page(table_id, leaf->parent, &parent);
     leaf_free_space = leaf->free_space;
-    parent_idx = buffer_read_page(table_id, leaf->parent, &parent);
-    unpin(leaf_idx);
+    // unpin(leaf_buffer_idx);
+    if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
 
     sibling_index = get_sibling_index(table_id, leaf_pgnum);
     k_prime_index = (sibling_index != -1) ? sibling_index : 0;
@@ -458,11 +504,12 @@ int db_delete(int64_t table_id, int64_t key) {
     else if (sibling_index == 0) sibling_pgnum = parent->left_child;
     else sibling_pgnum = parent->entries[sibling_index - 1].child;
 
-    unpin(parent_idx);
-
-    sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+    // unpin(parent_buffer_idx);
+    if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
+    sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
     sibling_free_space = sibling->free_space;
-    unpin(sibling_idx);
+    // unpin(sibling_buffer_idx);
+    if (sibling_buffer_idx != -1) buffers[sibling_buffer_idx]->is_pinned--;
     
     if (sibling_free_space + leaf_free_space >= FREE_SPACE) {
         merge_leaves(table_id, leaf_pgnum,
@@ -477,12 +524,16 @@ int db_delete(int64_t table_id, int64_t key) {
 }
 
 void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
-    page_t* leaf;
-    int leaf_idx;
+    page_t * leaf;
+    int leaf_buffer_idx;
     int i, key_index;
     uint16_t val_size, insertion_offset, deletion_offset;
+    #if verbose
+    printf("---delete_from_leaf() start---\n");
+    print_buffers();
+    #endif
 
-    leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
     
     key_index = 0;
     while (leaf->slots[key_index].key != key) key_index++;
@@ -510,22 +561,31 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
     }
 
     buffer_write_page(table_id, leaf_pgnum, &leaf);
+    #if verbose
+    printf("---delete_from_leaf() end---\n");
+    print_buffers();
+    #endif
 }
 
 void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                   pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
-    page_t* leaf, * sibling;
-    int leaf_idx, sibling_idx;
+    pagenum_t parent_pgnum;
+    page_t * leaf, * sibling;
+    int leaf_buffer_idx, sibling_buffer_idx;
     int i, j, leaf_size, sibling_size;
     uint16_t leaf_offset, sibling_offset;
+    #if verbose
+    printf("---merge_leaves() start---\n");
+    print_buffers();
+    #endif
 
     if (sibling_index != -1) {
-        leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
-        sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+        leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+        sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
     }
     else {
-        sibling_idx = buffer_read_page(table_id, sibling_pgnum, &leaf);
-        leaf_idx = buffer_read_page(table_id, leaf_pgnum, &sibling);
+        sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &leaf);
+        leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &sibling);
     }
 
     sibling_offset = sibling->free_space + SLOT_SIZE * sibling->num_keys;
@@ -544,22 +604,41 @@ void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
             leaf->values + leaf_offset, leaf_size);
     sibling->sibling = leaf->sibling;
 
-    unpin(leaf_idx);
-    buffer_write_page(table_id, sibling_pgnum, &sibling);
+    parent_pgnum = leaf->parent;
 
-    delete_from_child(table_id, leaf->parent, k_prime, leaf_pgnum);
+    if (sibling_index != -1) {
+        // unpin(leaf_buffer_idx);
+        if (leaf_buffer_idx != -1) buffers[leaf_buffer_idx]->is_pinned--;
+        buffer_write_page(table_id, sibling_pgnum, &sibling);
+        delete_from_child(table_id, parent_pgnum, k_prime, leaf_pgnum);
+    }
+    else {
+        // unpin(sibling_buffer_idx);
+        if (sibling_buffer_idx != -1) buffers[sibling_buffer_idx]->is_pinned--;
+        buffer_write_page(table_id, leaf_pgnum, &sibling);
+        delete_from_child(table_id, parent_pgnum, k_prime, sibling_pgnum);
+    }
+
+    #if verbose
+    printf("---merge_leaves() end---\n");
+    print_buffers();
+    #endif
 }
 
 void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                          pagenum_t sibling_pgnum, int sibling_index, int k_prime_index) {
-    page_t* leaf, * sibling, * parent;
-    int leaf_idx, sibling_idx, parent_idx;
+    page_t * leaf, * sibling, * parent;
+    int leaf_buffer_idx, sibling_buffer_idx, parent_buffer_idx;
     int i, src_index, dest_index;
     int64_t rotate_key;
     int16_t src_size, dest_offset;
+    #if verbose
+    printf("---redistribute_leaves() start---\n");
+    print_buffers();
+    #endif
 
-    leaf_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
-    sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+    leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
 
     while (leaf->free_space >= THRESHOLD) {
         src_index = (sibling_index != -1) ? sibling->num_keys - 1 : 0;
@@ -584,14 +663,13 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
         leaf->num_keys++;
         leaf->free_space -= (SLOT_SIZE + src_size);
 
-        rotate_key = sibling->slots[src_index].key;
-        unpin(sibling_idx);
-
-        delete_from_leaf(table_id, sibling_pgnum, rotate_key);
-        sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+        delete_from_leaf(table_id, sibling_pgnum, sibling->slots[src_index].key);
+        // unpin(sibling_buffer_idx);
+        if (sibling_buffer_idx != -1) buffers[sibling_buffer_idx]->is_pinned--;
+        sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
     }
     
-    parent_idx = buffer_read_page(table_id, leaf->parent, &parent);
+    parent_buffer_idx = buffer_read_page(table_id, leaf->parent, &parent);
     parent->entries[k_prime_index].key = (sibling_index != -1) ?
                                         leaf->slots[0].key :
                                         sibling->slots[0].key;
@@ -599,33 +677,50 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
 
     buffer_write_page(table_id, leaf_pgnum, &leaf);
     buffer_write_page(table_id, sibling_pgnum, &sibling);
+    #if verbose
+    printf("---redistribute_leaves() end---\n");
+    print_buffers();
+    #endif
 }
 
 void delete_from_child(int64_t table_id,
                        pagenum_t p_pgnum, int64_t key, pagenum_t child_pgnum) {
-    pagenum_t sibling_pgnum, parent_pgnum;
-    page_t* p, * sibling, * parent;
+    pagenum_t sibling_pgnum;
+    page_t * p, * sibling, * parent;
     int p_buffer_idx, sibling_buffer_idx, parent_buffer_idx;
     int sibling_index, k_prime_index, p_num_keys, sibling_num_keys;
     int64_t k_prime;
+    #if verbose
+    printf("---delete_from_child() start---\n");
+    print_buffers();
+    #endif
 
     delete_from_page(table_id, p_pgnum, key, child_pgnum);
 
     p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
 
     if (p->parent == 0) {
-        if (p->num_keys > 0) return;
+        if (p->num_keys > 0) {
+            // unpin(p_buffer_idx);
+            if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
+            return;
+        }
+        // unpin(p_buffer_idx);
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         adjust_root(table_id, p_pgnum);
         return;
     }
 
     if (p->num_keys >= ENTRY_ORDER / 2) {
+        // unpin(p_buffer_idx);
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         return;
     }
 
-    p_num_keys = p->num_keys;
     parent_buffer_idx = buffer_read_page(table_id, p->parent, &parent);
-    unpin(p_buffer_idx);
+    p_num_keys = p->num_keys;
+    // unpin(p_buffer_idx);
+    if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
 
     sibling_index = get_sibling_index(table_id, p_pgnum);
     k_prime_index = (sibling_index != -1) ? sibling_index : 0;
@@ -634,11 +729,12 @@ void delete_from_child(int64_t table_id,
     else if (sibling_index == -1) sibling_pgnum = parent->entries[0].child;
     else sibling_pgnum = parent->entries[sibling_index - 1].child;
 
-    unpin(parent_buffer_idx);
-
+    // unpin(parent_buffer_idx);
+    if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
     sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
     sibling_num_keys = sibling->num_keys;
-    unpin(sibling_buffer_idx);
+    // unpin(sibling_buffer_idx);
+    if (sibling_buffer_idx != -1) buffers[sibling_buffer_idx]->is_pinned--;
 
     if (sibling_num_keys + p_num_keys < ENTRY_ORDER - 1) {
         merge_pages(table_id, p_pgnum, sibling_pgnum, sibling_index, k_prime);
@@ -647,15 +743,23 @@ void delete_from_child(int64_t table_id,
         redistribute_pages(table_id, p_pgnum,
                            sibling_pgnum, sibling_index, k_prime_index, k_prime);
     }
+    #if verbose
+    printf("---delete_from_child() end---\n");
+    print_buffers();
+    #endif
 }
 
 void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
                       int64_t key, pagenum_t child_pgnum) {
-    page_t* p;
-    int p_idx;
+    page_t * p;
+    int p_buffer_idx;
     int i;
+    #if verbose
+    printf("---delete_from_page() start---\n");
+    print_buffers();
+    #endif
 
-    p_idx = buffer_read_page(table_id, p_pgnum, &p);
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
 
     i = 0;
     while (p->entries[i].key != key) i++;
@@ -677,21 +781,30 @@ void delete_from_page(int64_t table_id, pagenum_t p_pgnum,
 
     buffer_write_page(table_id, p_pgnum, &p);
     buffer_free_page(table_id, child_pgnum);
+    #if verbose
+    printf("---delete_from_page() end---\n");
+    print_buffers();
+    #endif
 }
 
 void merge_pages(int64_t table_id, pagenum_t p_pgnum,
                  pagenum_t sibling_pgnum, int sibling_index, int64_t k_prime) {
-    page_t* p, * sibling, * nephew;
-    int p_idx, sibling_idx, nephew_idx;
+    pagenum_t parent_pgnum;
+    page_t * p, * sibling, * nephew;
+    int p_buffer_idx, sibling_buffer_idx, nephew_buffer_idx;
     int i, j, insertion_index, p_end;
+    #if verbose
+    printf("---merge_pages() start---\n");
+    print_buffers();
+    #endif
     
     if (sibling_index != -1) {
-        p_idx = buffer_read_page(table_id, p_pgnum, &p);
-        sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+        p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+        sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
     }
     else {
-        sibling_idx = buffer_read_page(table_id, sibling_pgnum, &p);
-        p_idx = buffer_read_page(table_id, p_pgnum, &sibling);
+        sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &p);
+        p_buffer_idx = buffer_read_page(table_id, p_pgnum, &sibling);
     }
 
     insertion_index = sibling->num_keys;
@@ -707,45 +820,63 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
     }
     sibling->entries[insertion_index].child = p->left_child;
 
-    nephew_idx = buffer_read_page(table_id, sibling->left_child, &nephew);
-    nephew->parent = sibling_pgnum;
+    nephew_buffer_idx = buffer_read_page(table_id, sibling->left_child, &nephew);
+    nephew->parent = (sibling_index != -1) ? sibling_pgnum : p_pgnum;
     buffer_write_page(table_id, sibling->left_child, &nephew);
     for (i = 0; i < sibling->num_keys; i++) {
-        nephew_idx = buffer_read_page(table_id, sibling->entries[i].child, &nephew);
-        nephew->parent = sibling_pgnum;
+        nephew_buffer_idx = buffer_read_page(table_id, sibling->entries[i].child, &nephew);
+        nephew->parent = (sibling_index != -1) ? sibling_pgnum : p_pgnum;
         buffer_write_page(table_id, sibling->entries[i].child, &nephew);
     }
 
-    unpin(p_idx);
-    buffer_write_page(table_id, sibling_pgnum, &sibling);
+    parent_pgnum = p->parent;
 
-    delete_from_child(table_id, p->parent, k_prime, p_pgnum);
+    if (sibling_index != -1) {
+        // unpin(p_buffer_idx);
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
+        buffer_write_page(table_id, sibling_pgnum, &sibling);
+        delete_from_child(table_id, parent_pgnum, k_prime, p_pgnum);
+    }
+    else {
+        // unpin(sibling_buffer_idx);
+        if (sibling_buffer_idx != -1) buffers[sibling_buffer_idx]->is_pinned--;
+        buffer_write_page(table_id, p_pgnum, &sibling);
+        delete_from_child(table_id, parent_pgnum, k_prime, sibling_pgnum);
+    }
+    #if verbose
+    printf("---merge_pages() end---\n");
+    print_buffers();
+    #endif
 }
 
 void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
                         pagenum_t sibling_pgnum, int sibling_index,
                         int k_prime_index, int64_t k_prime) {
-    page_t* p, * sibling, * parent, * child;
-    int p_idx, sibling_idx, parent_idx, child_idx;
+    page_t * p, * sibling, * parent, * child;
+    int p_buffer_idx, sibling_buffer_idx, parent_buffer_idx, child_buffer_idx;
     int i;
+    #if verbose
+    printf("---redistribute_pages() start---\n");
+    print_buffers();
+    #endif
 
-    p_idx = buffer_read_page(table_id, p_pgnum, &p);
-    sibling_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    sibling_buffer_idx = buffer_read_page(table_id, sibling_pgnum, &sibling);
 
     if (sibling_index != -1) {
+        p->entries[0].child = p->left_child;
         for (i = p->num_keys; i > 0; i--) {
             p->entries[i].key = p->entries[i - 1].key;
             p->entries[i].child = p->entries[i - 1].child;
         }
-        p->entries[0].child = p->left_child;
 
         p->left_child = sibling->entries[sibling->num_keys - 1].child;
-        child_idx = buffer_read_page(table_id, p->left_child, &child);
+        child_buffer_idx = buffer_read_page(table_id, p->left_child, &child);
         child->parent = p_pgnum;
         buffer_write_page(table_id, p->left_child, &child);
         p->entries[0].key = k_prime;
 
-        parent_idx = buffer_read_page(table_id, p->parent, &parent);
+        parent_buffer_idx = buffer_read_page(table_id, p->parent, &parent);
         parent->entries[k_prime_index].key = sibling->entries[sibling->num_keys - 1].key;
         buffer_write_page(table_id, p->parent, &parent);
     }
@@ -753,11 +884,11 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
     else {
         p->entries[p->num_keys].key = k_prime;
         p->entries[p->num_keys].child = sibling->left_child;
-        child_idx = buffer_read_page(table_id, p->entries[p->num_keys].child, &child);
+        child_buffer_idx = buffer_read_page(table_id, p->entries[p->num_keys].child, &child);
         child->parent = p_pgnum;
         buffer_write_page(table_id, p->entries[p->num_keys].child, &child);
 
-        parent_idx = buffer_read_page(table_id, p->parent, &parent);
+        parent_buffer_idx = buffer_read_page(table_id, p->parent, &parent);
         parent->entries[k_prime_index].key = sibling->entries[0].key;
         buffer_write_page(table_id, p->parent, &parent);
 
@@ -773,46 +904,80 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
 
     buffer_write_page(table_id, p_pgnum, &p);
     buffer_write_page(table_id, sibling_pgnum, &sibling);
+    #if verbose
+    printf("---redistribute_pages() end---\n");
+    print_buffers();
+    #endif
 }
 
 void end_tree(int64_t table_id, pagenum_t root_pgnum) {
     set_root_num(table_id, 0);
     buffer_free_page(table_id, root_pgnum);
+    #if verbose
+    printf("---end_tree() start---\n");
+    print_buffers();
+    #endif
 }
 
 void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
-    page_t* root, * new_root;
+    page_t * root, * new_root;
     pagenum_t new_root_pgnum;
-    int root_idx, new_idx;
+    int root_buffer_idx, new_buffer_idx;
+    #if verbose
+    printf("---adjust_root() start---\n");
+    print_buffers();
+    #endif
 
-    root_idx = buffer_read_page(table_id, root_pgnum, &root);
+    root_buffer_idx = buffer_read_page(table_id, root_pgnum, &root);
     new_root_pgnum = root->left_child;
-    unpin(root_idx);
-
-    new_idx = buffer_read_page(table_id, new_root_pgnum, &new_root);
+    // unpin(root_buffer_idx);
+    if (root_buffer_idx != -1) buffers[root_buffer_idx]->is_pinned--;
+    new_buffer_idx = buffer_read_page(table_id, new_root_pgnum, &new_root);
 
     set_root_num(table_id, new_root_pgnum);
     new_root->parent = 0;
 
     buffer_free_page(table_id, root_pgnum);
     buffer_write_page(table_id, new_root_pgnum, &new_root);
+    #if verbose
+    printf("---adjust_root() end---\n");
+    print_buffers();
+    #endif
 }
 
+// void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
+//     page_t * root, * new_root;
+//     int root_buffer_idx, new_buffer_idx;
+
+//     root_buffer_idx = buffer_read_page(table_id, root_pgnum, &root);
+//     new_buffer_idx = buffer_read_page(table_id, root->left_child, &new_root);
+
+//     set_root_num(table_id, root->left_child);
+//     new_root->parent = 0;
+
+//     file_free_page(table_id, root_pgnum);
+//     file_write_page(table_id, root->left_child, &new_root);
+//     unpin(root_buffer_idx);
+// }
+
 int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
-    page_t* p, * parent;
-    int p_idx, parent_idx;
+    page_t * p, * parent;
+    int p_buffer_idx, parent_buffer_idx;
     int sibling_index;
-    p_idx = buffer_read_page(table_id, p_pgnum, &p);
-    parent_idx = buffer_read_page(table_id, p->parent, &parent);
-    unpin(p_idx);
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    parent_buffer_idx = buffer_read_page(table_id, p->parent, &parent);
+    // unpin(p_buffer_idx);
+    if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
     sibling_index = -1;
     if (parent->left_child == p_pgnum) {
-        unpin(parent_idx);
+        // unpin(parent_buffer_idx);
+        if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
         return sibling_index;
     }
     do {
         sibling_index++;
     } while (parent->entries[sibling_index].child != p_pgnum);
-    unpin(parent_idx);
+    // unpin(parent_buffer_idx);
+    if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
     return sibling_index;
 }
