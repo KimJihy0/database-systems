@@ -17,7 +17,7 @@ int64_t open_table(char * pathname);
 
 // SEARCH
 
-int db_find(int64_t table_id, int64_t key, char* ret_val, uint16_t* val_size);
+int db_find(int64_t table_id, int64_t key, char * ret_val, uint16_t * val_size);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
 
 // INSERTION

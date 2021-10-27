@@ -47,9 +47,13 @@ int db_find(int64_t table_id, int64_t key,
     for (i = 0; i < p->num_keys; i++) {
         if (p->slots[i].key == key) break;
     }
-    if (i == p->num_keys || ret_val == NULL || val_size == NULL) {
+    if (i == p->num_keys) {
         if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
-        return (i == p->num_keys) ? -1 : 1;
+        return -1;
+    }
+    if (ret_val == NULL || val_size == NULL) {
+        if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
+        return 1;
     }
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
@@ -81,7 +85,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
 
 // INSERTION
 
-int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
+int db_insert(int64_t table_id, int64_t key, char * value, uint16_t val_size) {
     pagenum_t leaf_pgnum;
     page_t * leaf;
     int leaf_buffer_idx;
@@ -111,13 +115,12 @@ int db_insert(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
 }
 
 void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
-                      int64_t key, char* value, uint16_t val_size) {
+                      int64_t key, char * value, uint16_t val_size) {
     page_t * leaf;
-    int leaf_buffer_idx;
     int i, insertion_index;
     uint16_t offset;
     
-    leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    buffer_read_page(table_id, leaf_pgnum, &leaf);
     
     insertion_index = 0;
     while (insertion_index < leaf->num_keys && leaf->slots[insertion_index].key < key) {
@@ -142,17 +145,16 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
 }
 
 void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
-                            int64_t key, char* value, uint16_t val_size) {
+                            int64_t key, char * value, uint16_t val_size) {
     pagenum_t new_pgnum;
     page_t * leaf, * new_leaf;
-    int leaf_buffer_idx, new_buffer_idx;
     int i, j, split, insertion_index, num_keys, total_size;
     int64_t new_key;
     uint16_t offset;
     slot_t temp_slots[65];
     char temp_values[3968];
     
-    leaf_buffer_idx = buffer_read_page(table_id, leaf_pgnum, &leaf);
+    buffer_read_page(table_id, leaf_pgnum, &leaf);
 
     insertion_index = 0;
     while (insertion_index < leaf->num_keys && leaf->slots[insertion_index].key < key) {
@@ -183,7 +185,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
     }
     new_pgnum = make_leaf(table_id);
 
-    new_buffer_idx = buffer_read_page(table_id, new_pgnum, &new_leaf);
+    buffer_read_page(table_id, new_pgnum, &new_leaf);
     
     offset = FREE_SPACE;
     for (i = 0; i < split; i++) {
@@ -238,11 +240,11 @@ void insert_into_parent(int64_t table_id,
     }
 
     left_index = get_left_index(table_id, parent_pgnum, left_pgnum);
-
+    
     parent_buffer_idx = buffer_read_page(table_id, parent_pgnum, &parent);
     num_keys = parent->num_keys;
     if (parent_buffer_idx != -1) buffers[parent_buffer_idx]->is_pinned--;
-    
+
     if (num_keys < ENTRY_ORDER - 1) {
         insert_into_page(table_id, parent_pgnum, left_index, key, right_pgnum);
     }
@@ -330,7 +332,7 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
     insert_into_parent(table_id, old_pgnum, k_prime, new_pgnum);
 }
 
-void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
+void start_tree(int64_t table_id, int64_t key, char * value, uint16_t val_size) {
     pagenum_t root_pgnum;
     page_t * root;
     int root_buffer_idx;
@@ -356,6 +358,7 @@ void insert_into_new_root(int64_t table_id,
     pagenum_t root_pgnum;
     page_t * left, * right, * root;
     int left_buffer_idx, right_buffer_idx, root_buffer_idx;
+    printf("---insert_into_new_root() start---\n");
     
     root_pgnum = make_page(table_id);
 
@@ -370,11 +373,13 @@ void insert_into_new_root(int64_t table_id,
     root->parent = 0;
     left->parent = root_pgnum;
     right->parent = root_pgnum;
-    set_root_num(table_id, root_pgnum);
 
     buffer_write_page(table_id, left_pgnum, &left);
     buffer_write_page(table_id, right_pgnum, &right);
     buffer_write_page(table_id, root_pgnum, &root);
+
+    set_root_num(table_id, root_pgnum);
+    printf("---insert_into_new_root() end---\n");
 }
 
 pagenum_t make_leaf(int64_t table_id) {

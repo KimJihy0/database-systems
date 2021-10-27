@@ -23,6 +23,7 @@ int get_buffer_idx(int64_t table_id, pagenum_t page_num) {
         if (buffers[i] != NULL &&
             buffers[i]->table_id == table_id && buffers[i]->page_num == page_num)
             return i;
+    // printf("get_buffer_idx : -1\n");
     return -1;
 }
 
@@ -34,7 +35,7 @@ int request_page(int64_t table_id, pagenum_t page_num) {
         for (i = 0; i < buf_size; i++) {
             if (buffers[i] == NULL) {
                 buffer_idx = i;
-                buffers[buffer_idx] = (buffer_t*)malloc(sizeof(buffer_t));
+                buffers[buffer_idx] = (buffer_t *)malloc(sizeof(buffer_t));
                 buffers[buffer_idx]->next_LRU = NULL;
                 buffers[buffer_idx]->prev_LRU = NULL;
                 break;
@@ -86,11 +87,12 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
         if (header_buffer_idx != -1) {
             if (buffers[header_buffer_idx]->is_dirty)
                 file_write_page(table_id, 0, header);
-            page_num = file_alloc_page(table_id);
-            file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
         }
-        else page_num = file_alloc_page(table_id);
-        if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
+        page_num = file_alloc_page(table_id);
+        if (header_buffer_idx != -1) {
+            file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
+            buffers[header_buffer_idx]->is_pinned--;
+        }
         return page_num;
     }
     page_num = header->free_num;
@@ -103,9 +105,8 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
 
 void buffer_free_page(int64_t table_id, pagenum_t page_num) {
     page_t * header, * free;
-    int header_buffer_idx, free_buffer_idx;
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    free_buffer_idx = buffer_read_page(table_id, page_num, &free);
+    buffer_read_page(table_id, 0, &header);
+    buffer_read_page(table_id, page_num, &free);
     free->next_frpg = header->free_num;
     header->free_num = page_num;
     buffer_write_page(table_id, 0, &header);
@@ -120,19 +121,24 @@ int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest_page) 
         *dest_page = &(buffers[buffer_idx]->frame);
     }
     else {
-        file_read_page(table_id, page_num, *dest_page); 
+        // printf("file_read_page()\n");
+        page_t page;
+        file_read_page(table_id, page_num, &page); 
+        *dest_page = &page;
     }
     return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t ** src_page) {
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src_page) {
     int buffer_idx;
-    buffer_idx = request_page(table_id, page_num);
+    buffer_idx = get_buffer_idx(table_id, page_num);
+    // printf("get_buffer_idx: %d\n", buffer_idx);
     if (buffer_idx != -1) {
         buffers[buffer_idx]->is_dirty = 1;
         buffers[buffer_idx]->is_pinned--;
     }
     else {
+        printf("file_write_page()\n");
         file_write_page(table_id, page_num, *src_page);
     }
 }
@@ -148,8 +154,7 @@ pagenum_t get_root_num(int64_t table_id) {
 
 void set_root_num(int64_t table_id, pagenum_t root_num) {
     page_t * header;
-    int header_buffer_idx;
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    buffer_read_page(table_id, 0, &header);
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
 }
@@ -158,9 +163,14 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
  * 0644
  * 파일 경로 ? (e.g. "/home/table1")
  * page_t** or const* page_t* or page_t* const*
- * 
+ * all buffers are in use. 처리
+ * 더블포인터 말고 포인터로는?
+ * buffer_alloc_page() 확인
+ * buffer_free_page() 한 뒤에 buffer_index nullify해도 되는지 확인 (overhead 감소)
+ * insert, delete, insert, delete -> pagenum  확인
  * 
  * ---Done---
+ * pin_count <= 1
  * Find에서 Input/ouput error 이유찾기.
  * NUM_KEYS = 10000, NUM_BUFS = 100
  * insert_into_page_split() ENTRY_ORDER + 1 -> ENTRY_ORDER
@@ -169,14 +179,13 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
  * unpin() 함수풀기
  * merge에서 swap-> idx 설정 틀릴 수 있음
  * alloc / free 실시간동기화
- * delete (projec2랑 비교하면서 해야됨)
+ * delete (project2랑 비교하면서 해야됨)
  * file_open_table_file() 안에서 hash 처리
  * replacement시 pin?
  * pin, unpin 위치 index -> buffer로 이동
  * 구조(page.h, hash.h, hash.cc)
  * file.h specification 변경금지
  * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
- * all buffers are in use. 처리
  * 지역변수 -> 동적할당(필요없음)
  * 
  * ---Recent Modification---

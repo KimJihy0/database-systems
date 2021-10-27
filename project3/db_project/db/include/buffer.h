@@ -23,8 +23,8 @@ int request_page(int64_t table_id, pagenum_t page_num);
 
 pagenum_t buffer_alloc_page(int64_t table_id);
 void buffer_free_page(int64_t table_id, pagenum_t page_num);
-int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page);
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t** src_page);
+int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest_page);
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src_page);
 
 pagenum_t get_root_num(int64_t table_id);
 void set_root_num(int64_t table_id, pagenum_t root_num);
