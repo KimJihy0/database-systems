@@ -23,6 +23,7 @@ void print_tree_from_disk(int64_t table_id);
 int64_t free_num(int64_t table_id);
 void print_LRUs();
 void print_buffers();
+void print_freepg_list(int64_t table_id);
 
 char* val(int key);
 int size();
@@ -99,76 +100,85 @@ int main(int argc, char** argv) {
 	default_random_engine rng(rd());
 	char value[112];
 	uint16_t val_size;
-	shuffle(keys.begin(), keys.end(), rng);
 
 	printf("[TEST START]\n\n");
 	init_db(NUM_BUFS);
 	int64_t table_id = open_table((char*)"table0");
-
-	printf("[INSERT START]\n");
-	for (const auto& i : keys) {
-		// printf("insert %4d\n", i);
-		if (db_insert(table_id, i, val(i), size(i)) != 0) {
-            // db_insert(table_id, 0, val(0), size(0));
-            goto func_exit;
-        }
-		// print_buffers();
-	}
-	printf("[INSERT END]\n\n");
-
-    print_LRUs();
-    goto func_exit;
-
-	printf("[FIND START]\n");
-	for (const auto& i : keys) {
-		memset(value, 0x00, 112);
-		val_size = 0;
-		// printf("find %4d\n", i);
-		if(db_find(table_id, i, value, &val_size) != 0) goto func_exit;
-		// else if (size(i) != val_size ||
-		// 		 val(i) != std::string(value, val_size)) {
-		// 	printf("value dismatched\n");
-		// 	goto func_exit;
-		// }
-	}
-	printf("[FIND END]\n\n");
-
-    print_tree(table_id);
+    
+    printf("\n");
+    print_freepg_list(table_id);
     printf("\n");
 
-	printf("[DELETE START]\n");
-    int check;
-	for (const auto& i : keys) {
-        // printf("\n\ndelete %4d\n", i);
-        check = db_delete(table_id, i);
-        if (check != 0) {
-            printf("\ndb_delete(%d) = %d\n\n", i, check);
-            goto func_exit;
+    for (int j = 0; j < 5; j++) {
+
+
+        
+        shuffle(keys.begin(), keys.end(), rng);
+
+        printf("[INSERT START]\n");
+        for (const auto& i : keys) {
+            // printf("insert %4d\n", i);
+            if (db_insert(table_id, i, val(i), size(i)) != 0) {
+                // db_insert(table_id, 0, val(0), size(0));
+                goto func_exit;
+            }
+            // print_buffers();
         }
-		// if (db_delete(table_id, i) != 0) goto func_exit;
-        // print_all(table_id);
-        // print_tree(table_id);
-	}
-	printf("[DELETE END]\n\n");
+        printf("[INSERT END]\n\n");
 
-	printf("[FIND START AGAIN]\n");
-	for (const auto& i : keys) {
-		memset(value, 0x00, 112);
-		val_size = 0;
-		if (db_find(table_id, i, value, &val_size) == 0) goto func_exit;
-	}
-	printf("[FIND END AGAIN]\n\n");
+        // print_LRUs();
+        // goto func_exit;
 
-	printf("[TEST END]\n\n");
-	
+        printf("[FIND START]\n");
+        for (const auto& i : keys) {
+            memset(value, 0x00, 112);
+            val_size = 0;
+            // printf("find %4d\n", i);
+            if(db_find(table_id, i, value, &val_size) != 0) goto func_exit;
+            // else if (size(i) != val_size ||
+            // 		 val(i) != std::string(value, val_size)) {
+            // 	printf("value dismatched\n");
+            // 	goto func_exit;
+            // }
+        }
+        printf("[FIND END]\n\n");
+
+        print_tree(table_id);
+        printf("\n");
+
+        printf("[DELETE START]\n");
+        int check;
+        for (const auto& i : keys) {
+            // printf("\n\ndelete %4d\n", i);
+            check = db_delete(table_id, i);
+            if (check != 0) {
+                printf("\ndb_delete(%d) = %d\n\n", i, check);
+                goto func_exit;
+            }
+            // if (db_delete(table_id, i) != 0) goto func_exit;
+            // print_all(table_id);
+            // print_tree(table_id);
+        }
+        printf("[DELETE END]\n\n");
+
+        printf("[FIND START AGAIN]\n");
+        for (const auto& i : keys) {
+            memset(value, 0x00, 112);
+            val_size = 0;
+            if (db_find(table_id, i, value, &val_size) == 0) goto func_exit;
+        }
+        printf("[FIND END AGAIN]\n\n");
+
+        print_tree(table_id);
+        printf("\n");
+        print_freepg_list(table_id);
+        printf("\n");
+
+    }
+
+    printf("[TEST END]\n\n");    
+
 	func_exit:
-    print_LRUs();
-    printf("\n");
-    print_buffers();
-
-    printf("\n");
-    print_all(table_id);
-    printf("\n");
 	print_tree(table_id);
     printf("\n");
 	printf("[SHUTDOWN START]\n");
@@ -183,9 +193,10 @@ int main(int argc, char** argv) {
 
 #if 0
 void test1_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
-    page_t page;
-    file_read_page(table_id, page_num, &page);
-    *dest_page = &(page);
+    page_t * page;
+    page = (page_t *)malloc(sizeof(page_t));
+    file_read_page(table_id, page_num, page);
+    *dest_page = page;
 }
 void test1_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src_page) {
     file_write_page(table_id, page_num, *src_page);
@@ -206,13 +217,13 @@ int main(int argc, char** argv) {
 	printf("header->root_num: %ld\n", header->root_num);
     header->free_num = 1252;
 
-    test1_read_page(table_id, 1, &temp);
+    // test1_read_page(table_id, 1, &temp);
     
     test1_write_page(table_id, 0, &header);
 
     header->free_num = 1111;
 
-    test1_read_page(table_id, 0, &header);
+    // test1_read_page(table_id, 0, &header);
 
 	printf("header->free_num: %ld\n", header->free_num);
 	printf("header->num_pages: %ld\n", header->num_pages);
@@ -533,4 +544,22 @@ void print_buffers() {
         printf("is_pinned: %d\n", buffers[i]->is_pinned);
         printf("\n");
     }
+}
+
+void print_freepg_list(int64_t table_id) {
+    page_t * page;
+    pagenum_t page_num;
+    pagenum_t temp;
+    buffer_read_page(table_id, 0, &page);
+    page_num = page->next_frpg;
+    buffer_write_page(table_id, 0, &page);
+    printf("   0");
+    while (page_num) {
+        printf("->%4ld", page_num);
+        buffer_read_page(table_id, page_num, &page);
+        temp = page_num;
+        page_num = page->next_frpg;
+        buffer_write_page(table_id, temp, &page);
+    }
+    printf("\n");
 }

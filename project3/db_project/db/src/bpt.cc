@@ -358,7 +358,6 @@ void insert_into_new_root(int64_t table_id,
     pagenum_t root_pgnum;
     page_t * left, * right, * root;
     int left_buffer_idx, right_buffer_idx, root_buffer_idx;
-    printf("---insert_into_new_root() start---\n");
     
     root_pgnum = make_page(table_id);
 
@@ -379,7 +378,6 @@ void insert_into_new_root(int64_t table_id,
     buffer_write_page(table_id, root_pgnum, &root);
 
     set_root_num(table_id, root_pgnum);
-    printf("---insert_into_new_root() end---\n");
 }
 
 pagenum_t make_leaf(int64_t table_id) {

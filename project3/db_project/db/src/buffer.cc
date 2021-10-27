@@ -23,7 +23,6 @@ int get_buffer_idx(int64_t table_id, pagenum_t page_num) {
         if (buffers[i] != NULL &&
             buffers[i]->table_id == table_id && buffers[i]->page_num == page_num)
             return i;
-    // printf("get_buffer_idx : -1\n");
     return -1;
 }
 
@@ -121,10 +120,9 @@ int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest_page) 
         *dest_page = &(buffers[buffer_idx]->frame);
     }
     else {
-        // printf("file_read_page()\n");
-        page_t page;
-        file_read_page(table_id, page_num, &page); 
-        *dest_page = &page;
+        page_t * page = (page_t *)malloc(sizeof(page_t));
+        file_read_page(table_id, page_num, page); 
+        *dest_page = page;
     }
     return buffer_idx;
 }
@@ -132,14 +130,13 @@ int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest_page) 
 void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src_page) {
     int buffer_idx;
     buffer_idx = get_buffer_idx(table_id, page_num);
-    // printf("get_buffer_idx: %d\n", buffer_idx);
     if (buffer_idx != -1) {
         buffers[buffer_idx]->is_dirty = 1;
         buffers[buffer_idx]->is_pinned--;
     }
     else {
-        printf("file_write_page()\n");
         file_write_page(table_id, page_num, *src_page);
+        free(*src_page);
     }
 }
 
@@ -162,14 +159,13 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
 /* ---To do---
  * 0644
  * 파일 경로 ? (e.g. "/home/table1")
- * page_t** or const* page_t* or page_t* const*
- * all buffers are in use. 처리
- * 더블포인터 말고 포인터로는?
- * buffer_alloc_page() 확인
  * buffer_free_page() 한 뒤에 buffer_index nullify해도 되는지 확인 (overhead 감소)
- * insert, delete, insert, delete -> pagenum  확인
  * 
  * ---Done---
+ * buffer_alloc_page() 확인
+ * insert, delete, insert, delete -> pagenum  확인
+ * page_t** or const* page_t* or page_t* const*
+ * all buffers are in use. 처리
  * pin_count <= 1
  * Find에서 Input/ouput error 이유찾기.
  * NUM_KEYS = 10000, NUM_BUFS = 100
