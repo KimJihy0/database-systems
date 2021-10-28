@@ -21,7 +21,8 @@ int get_buffer_idx(int64_t table_id, pagenum_t page_num) {
     int i;
     for (i = 0; i < buf_size; i++)
         if (buffers[i] != NULL &&
-            buffers[i]->table_id == table_id && buffers[i]->page_num == page_num)
+            buffers[i]->table_id == table_id &&
+            buffers[i]->page_num == page_num)
             return i;
     return -1;
 }
