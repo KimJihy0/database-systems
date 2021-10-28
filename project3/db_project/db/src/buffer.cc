@@ -155,4 +155,4 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
     buffer_read_page(table_id, 0, &header);
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
-}
+} 
