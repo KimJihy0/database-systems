@@ -7,10 +7,10 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 100
+#define NUM_BUFS 1600000
+#define NUM_REPS 5
 using namespace std;
 
-void print_leaves(int64_t table_id);
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num); 
 void print_pgnum_from_disk(int64_t table_id, pagenum_t page_num); 
@@ -20,7 +20,6 @@ int path_to_root(int64_t table_id, pagenum_t child_num);
 void print_tree(int64_t table_id);
 int path_to_root_from_disk(int64_t table_id, pagenum_t child_num);
 void print_tree_from_disk(int64_t table_id);
-int64_t free_num(int64_t table_id);
 void print_LRUs();
 void print_buffers();
 void print_freepg_list(int64_t table_id);
@@ -28,66 +27,6 @@ void print_freepg_list(int64_t table_id);
 char* val(int key);
 int size();
 int size(int key);
-
-#if 0
-int main(int argc, char** argv) {
-    init_db(NUM_BUFS);
-    int64_t table_id = open_table((char*)"table0");
-    pagenum_t alloc_page, free_page;
-
-    alloc_page = buffer_alloc_page(table_id);
-    free_page = buffer_alloc_page(table_id);;
-
-    buffer_free_page(table_id, free_page);
-
-    page_t* header;
-    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    printf("header->free_num(2558) : %ld\n", header->free_num);
-    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
-
-    for (int i = 0; i < 2559; i++) {
-        buffer_alloc_page(table_id);
-    }
-
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    printf("header->free_num(5118) : %ld\n", header->free_num);
-
-    return 0;
-}
-#endif
-
-#if 0
-int main(int argc, char** argv) {
-    init_db(NUM_BUFS);
-    int64_t table_id = open_table((char*)"table0");
-
-    for (int i = 10; i < 25; i++)
-        db_delete(table_id, i);
-
-    print_all(table_id);
-
-    shutdown_db();
-    
-    return 0;
-}
-#endif
-
-#if 0
-int main(int argc, char** argv) {
-    init_db(30);
-    int64_t table_id = open_table((char*)"table0");
-
-    print_tree_from_disk(table_id); printf("\n");
-    print_all_from_disk(table_id);
-    // print_pgnum_from_disk(table_id, 2239);
-    // print_pgnum_from_disk(table_id, 2519);
-    // print_pgnum_from_disk(table_id, 2375);
-
-    shutdown_db();
-
-    return 0;
-}
-#endif
 
 #if 1
 int main(int argc, char** argv) {
@@ -102,34 +41,32 @@ int main(int argc, char** argv) {
 	uint16_t val_size;
 
 	printf("[TEST START]\n\n");
+    printf("\t[NUM_KEYS : %7d] \n", NUM_KEYS);
+    printf("\t[NUM_BUFS : %7d] \n", NUM_BUFS);
+    printf("\t[NUM_REPS : %7d] \n", NUM_REPS);
+    printf("\n");
+
+    printf("[INIT START]\n");
 	init_db(NUM_BUFS);
+    printf("[INIT END]\n\n");
+
+    printf("[OPEN START]\n");
 	int64_t table_id = open_table((char*)"table0");
-    
-    printf("\n");
-    print_freepg_list(table_id);
-    printf("\n");
+    printf("[OPEN END]\n\n");
 
-    for (int j = 0; j < 5; j++) {
-
-
-        
+    for (int j = 0; j < NUM_REPS; j++) {
         shuffle(keys.begin(), keys.end(), rng);
 
-        printf("[INSERT START]\n");
+        printf("[REP%2d]\n\n", j);
+
+        printf("\t[INSERT START]\n");
         for (const auto& i : keys) {
             // printf("insert %4d\n", i);
-            if (db_insert(table_id, i, val(i), size(i)) != 0) {
-                // db_insert(table_id, 0, val(0), size(0));
-                goto func_exit;
-            }
-            // print_buffers();
+            if (db_insert(table_id, i, val(i), size(i)) != 0) goto func_exit;
         }
-        printf("[INSERT END]\n\n");
+        printf("\t[INSERT END]\n\n");
 
-        // print_LRUs();
-        // goto func_exit;
-
-        printf("[FIND START]\n");
+        printf("\t[FIND START]\n");
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
             val_size = 0;
@@ -141,51 +78,45 @@ int main(int argc, char** argv) {
             // 	goto func_exit;
             // }
         }
-        printf("[FIND END]\n\n");
+        printf("\t[FIND END]\n\n");
 
-        print_tree(table_id);
-        printf("\n");
+        // print_tree(table_id);
+        // printf("\n");
 
-        printf("[DELETE START]\n");
-        int check;
+        printf("\t[DELETE START]\n");
         for (const auto& i : keys) {
-            // printf("\n\ndelete %4d\n", i);
-            check = db_delete(table_id, i);
-            if (check != 0) {
-                printf("\ndb_delete(%d) = %d\n\n", i, check);
-                goto func_exit;
-            }
-            // if (db_delete(table_id, i) != 0) goto func_exit;
-            // print_all(table_id);
-            // print_tree(table_id);
+            // printf("delete %4d\n", i);
+            if (db_delete(table_id, i) != 0) goto func_exit;
         }
-        printf("[DELETE END]\n\n");
+        printf("\t[DELETE END]\n\n");
 
-        printf("[FIND START AGAIN]\n");
+        printf("\t[FIND START AGAIN]\n");
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
             val_size = 0;
             if (db_find(table_id, i, value, &val_size) == 0) goto func_exit;
         }
-        printf("[FIND END AGAIN]\n\n");
+        printf("\t[FIND END AGAIN]\n\n");
 
-        print_tree(table_id);
-        printf("\n");
-        print_freepg_list(table_id);
-        printf("\n");
-
+        // print_tree(table_id);
+        // printf("\n");
     }
 
     printf("[TEST END]\n\n");    
 
 	func_exit:
-	print_tree(table_id);
-    printf("\n");
 	printf("[SHUTDOWN START]\n");
+    // print_freepg_list(table_id);
+    // printf("\n");
+	// print_tree(table_id);
+    // printf("\n");
 	if (shutdown_db() != 0) {
 		return 0;
 	}
 	printf("[SHUTDOWN END]\n");
+
+    // print_tree_from_disk(table_id);
+
 	return 0;
 }
 #endif
@@ -212,20 +143,20 @@ int main(int argc, char** argv) {
     page_t* temp;
 	
 	test1_read_page(table_id, 0, &header);
-	printf("header->free_num: %ld\n", header->free_num);
+	printf("header->next_frpg: %ld\n", header->next_frpg);
 	printf("header->num_pages: %ld\n", header->num_pages);
 	printf("header->root_num: %ld\n", header->root_num);
-    header->free_num = 1252;
+    header->next_frpg = 1252;
 
     // test1_read_page(table_id, 1, &temp);
     
     test1_write_page(table_id, 0, &header);
 
-    header->free_num = 1111;
+    header->next_frpg = 1111;
 
     // test1_read_page(table_id, 0, &header);
 
-	printf("header->free_num: %ld\n", header->free_num);
+	printf("header->next_frpg: %ld\n", header->next_frpg);
 	printf("header->num_pages: %ld\n", header->num_pages);
 	printf("header->root_num: %ld\n", header->root_num);
 
@@ -237,54 +168,24 @@ int main(int argc, char** argv) {
 	// test2_read_page(table_id, 0, &leaf);
 	
 
-	// printf("leaf->free_num: %ld\n", leaf->free_num);
+	// printf("leaf->next_frpg: %ld\n", leaf->next_frpg);
 	// printf("leaf->num_pages: %ld\n", leaf->num_pages);
 	// printf("leaf->root_num: %ld\n", leaf->root_num);
 
-	// leaf->free_num = 1252;
+	// leaf->next_frpg = 1252;
 
 	// printf("\n");
-	// printf("buffers[0]->free_num: %ld\n", buffers[0]->frame.free_num);
+	// printf("buffers[0]->next_frpg: %ld\n", buffers[0]->frame.next_frpg);
 		
     return 0;
 }
 #endif
 
-void print_leaves(int64_t table_id) {
-    int i;
-    pagenum_t temp_pgnum;
-    page_t* header, * temp;
-    buffer_read_page(table_id, 0, &header);
-    temp_pgnum = get_root_num(table_id);
-    buffer_read_page(table_id, temp_pgnum, &temp);
-    if (temp_pgnum == 0) {
-        printf("Empty tree.\n");
-        return;
-    }
-    while (!temp->is_leaf) {
-        temp_pgnum = temp->left_child;
-        buffer_read_page(table_id, temp_pgnum, &temp);
-    }
-    printf("-----leaves-----\n");
-    while (true) {
-        for (i = 0; i < temp->num_keys; i++) {
-            printf("%3ld:%s ", temp->slots[i].key, temp->values + temp->slots[i].offset - HEADER_SIZE);
-        }
-        if (temp->sibling != 0) {
-            printf("\n\n");
-            temp_pgnum = temp->sibling;
-            buffer_read_page(table_id, temp_pgnum, &temp);
-        }
-        else break;
-    }
-    printf("\n");
-}
-
 void print_page(pagenum_t page_num, page_t page) {
 	if (page_num == 0) {
 		printf("----header information----\n");
         printf("number: %ld\n", page_num);
-		printf("free_num: %ld\n", page.free_num);
+		printf("next_frpg: %ld\n", page.next_frpg);
 		printf("num_pages: %ld\n", page.num_pages);
 		printf("root_num: %ld\n", page.root_num);
 		printf("\n");

@@ -82,7 +82,7 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
     page_t * header, * alloc;
     int header_buffer_idx, alloc_buffer_idx;
     header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    if (header->free_num == 0) {
+    if (header->next_frpg == 0) {
         if (header_buffer_idx != -1) {
             if (buffers[header_buffer_idx]->is_dirty)
                 file_write_page(table_id, 0, header);
@@ -94,9 +94,9 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
         }
         return page_num;
     }
-    page_num = header->free_num;
+    page_num = header->next_frpg;
     alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
-    header->free_num = alloc->next_frpg;
+    header->next_frpg = alloc->next_frpg;
     if (alloc_buffer_idx != -1) buffers[alloc_buffer_idx]->is_pinned--;
     buffer_write_page(table_id, 0, &header);
     return page_num;
@@ -106,28 +106,28 @@ void buffer_free_page(int64_t table_id, pagenum_t page_num) {
     page_t * header, * free;
     buffer_read_page(table_id, 0, &header);
     buffer_read_page(table_id, page_num, &free);
-    free->next_frpg = header->free_num;
-    header->free_num = page_num;
+    free->next_frpg = header->next_frpg;
+    header->next_frpg = page_num;
     buffer_write_page(table_id, 0, &header);
     buffer_write_page(table_id, page_num, &free);
 }
 
-int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest_page) {
+int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest) {
     int buffer_idx;
     buffer_idx = request_page(table_id, page_num);
     if (buffer_idx != -1) {
         buffers[buffer_idx]->is_pinned++;
-        *dest_page = &(buffers[buffer_idx]->frame);
+        *dest = &(buffers[buffer_idx]->frame);
     }
     else {
         page_t * page = (page_t *)malloc(sizeof(page_t));
         file_read_page(table_id, page_num, page); 
-        *dest_page = page;
+        *dest = page;
     }
     return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src_page) {
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src) {
     int buffer_idx;
     buffer_idx = get_buffer_idx(table_id, page_num);
     if (buffer_idx != -1) {
@@ -135,10 +135,10 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * sr
         buffers[buffer_idx]->is_pinned--;
     }
     else {
-        file_write_page(table_id, page_num, *src_page);
-        free(*src_page);
+        file_write_page(table_id, page_num, *src);
+        free(*src);
     }
-}
+} 
 
 pagenum_t get_root_num(int64_t table_id) {
     page_t * header;
@@ -155,37 +155,3 @@ void set_root_num(int64_t table_id, pagenum_t root_num) {
     header->root_num = root_num;
     buffer_write_page(table_id, 0, &header);
 }
-
-/* ---To do---
- * 0644
- * 파일 경로 ? (e.g. "/home/table1")
- * buffer_free_page() 한 뒤에 buffer_index nullify해도 되는지 확인 (overhead 감소)
- * 
- * ---Done---
- * buffer_alloc_page() 확인
- * insert, delete, insert, delete -> pagenum  확인
- * page_t** or const* page_t* or page_t* const*
- * all buffers are in use. 처리
- * pin_count <= 1
- * Find에서 Input/ouput error 이유찾기.
- * NUM_KEYS = 10000, NUM_BUFS = 100
- * insert_into_page_split() ENTRY_ORDER + 1 -> ENTRY_ORDER
- * 모든 함수 모든 경우의 수 디버깅
- * ************************** parent 수정 어디서 안되는지 확인 ; 이거때메 오류남 **************************
- * unpin() 함수풀기
- * merge에서 swap-> idx 설정 틀릴 수 있음
- * alloc / free 실시간동기화
- * delete (project2랑 비교하면서 해야됨)
- * file_open_table_file() 안에서 hash 처리
- * replacement시 pin?
- * pin, unpin 위치 index -> buffer로 이동
- * 구조(page.h, hash.h, hash.cc)
- * file.h specification 변경금지
- * 갈아엎기 -- 메모리 복사가 아닌 메모리 참조를 해야함!!
- * 지역변수 -> 동적할당(필요없음)
- * 
- * ---Recent Modification---
- * doubling 추가
- * request_page에 합침 (빈버퍼 찾았을 때랑 victim 찾았을 때)
- * buffer_write_page 수정 (인자, 내용)
- */
