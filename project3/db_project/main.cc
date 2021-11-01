@@ -1,4 +1,4 @@
-#include "db/include/bpt.h"
+#include "bpt.h"
 
 #include <queue>
 #include <vector>
@@ -7,8 +7,9 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 1600000
+#define NUM_BUFS 100
 #define NUM_REPS 5
+
 using namespace std;
 
 void print_page(pagenum_t page_num, page_t page);
@@ -41,9 +42,9 @@ int main(int argc, char** argv) {
 	uint16_t val_size;
 
 	printf("[TEST START]\n\n");
-    printf("\t[NUM_KEYS : %7d] \n", NUM_KEYS);
-    printf("\t[NUM_BUFS : %7d] \n", NUM_BUFS);
-    printf("\t[NUM_REPS : %7d] \n", NUM_REPS);
+    printf("[NUM_KEYS : %7d] \n", NUM_KEYS);
+    printf("[NUM_BUFS : %7d] \n", NUM_BUFS);
+    printf("[NUM_REPS : %7d] \n", NUM_REPS);
     printf("\n");
 
     printf("[INIT START]\n");
@@ -57,14 +58,14 @@ int main(int argc, char** argv) {
     for (int j = 0; j < NUM_REPS; j++) {
         shuffle(keys.begin(), keys.end(), rng);
 
-        printf("[REP%2d]\n\n", j);
+        printf("[REP%2d] ", j);
 
-        printf("\t[INSERT START]\n");
+        printf("[INSERT START]\n");
         for (const auto& i : keys) {
             // printf("insert %4d\n", i);
             if (db_insert(table_id, i, val(i), size(i)) != 0) goto func_exit;
         }
-        printf("\t[INSERT END]\n\n");
+        printf("\t[INSERT END]\n");
 
         printf("\t[FIND START]\n");
         for (const auto& i : keys) {
@@ -78,7 +79,7 @@ int main(int argc, char** argv) {
             // 	goto func_exit;
             // }
         }
-        printf("\t[FIND END]\n\n");
+        printf("\t[FIND END]\n");
 
         // print_tree(table_id);
         // printf("\n");
@@ -88,7 +89,7 @@ int main(int argc, char** argv) {
             // printf("delete %4d\n", i);
             if (db_delete(table_id, i) != 0) goto func_exit;
         }
-        printf("\t[DELETE END]\n\n");
+        printf("\t[DELETE END]\n");
 
         printf("\t[FIND START AGAIN]\n");
         for (const auto& i : keys) {
@@ -96,13 +97,13 @@ int main(int argc, char** argv) {
             val_size = 0;
             if (db_find(table_id, i, value, &val_size) == 0) goto func_exit;
         }
-        printf("\t[FIND END AGAIN]\n\n");
+        printf("\t[FIND END AGAIN]\n");
 
         // print_tree(table_id);
         // printf("\n");
     }
 
-    printf("[TEST END]\n\n");    
+    printf("\n[TEST END]\n\n");    
 
 	func_exit:
 	printf("[SHUTDOWN START]\n");
@@ -437,7 +438,7 @@ void print_LRUs() {
 
 void print_buffers() {
     int i;
-    for (i = 0; i < buf_size; i++) {
+    for (i = 0; i < buffer_size; i++) {
         printf("\n\n----------buffer [%2d]----------\n", i);
         print_page(buffers[i]->page_num, buffers[i]->frame);
         printf("\n");

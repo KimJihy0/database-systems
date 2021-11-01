@@ -14,7 +14,10 @@ struct buffer_t {
 };
 
 extern buffer_t ** buffers;
-extern int buf_size;
+extern int buffer_size;
+
+int buffer_init_buffer(int num_buf);
+int buffer_shutdown_buffer();
 
 int get_first_LRU_idx();
 int get_last_LRU_idx();

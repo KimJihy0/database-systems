@@ -3,30 +3,12 @@
 // DBMS
 
 int init_db(int num_buf) {
-    int i;
-    for (i = 0; i < NUM_BUCKETS; i++) {
-        tables[i].pathname[0] = 0;
-    }
-    buf_size = num_buf;
-    buffers = (buffer_t **)malloc(buf_size * sizeof(buffer_t *));
-    if (buffers == NULL) return -1;
-    for (i = 0; i < buf_size; i++) {
-        buffers[i] = NULL;
-    }
+    if (buffer_init_buffer(num_buf) != 0) return -1;
     return 0;
 }
 
 int shutdown_db() {
-    int i;
-    for (i = 0; i < buf_size; i++) {
-        if (buffers[i] != NULL) {
-            file_write_page(buffers[i]->table_id,
-                            buffers[i]->page_num,
-                            &(buffers[i]->frame));
-            free(buffers[i]);
-        }
-    }
-    free(buffers);
+    if (buffer_shutdown_buffer() != 0) return -1;
     file_close_table_file();
     return 0;
 }

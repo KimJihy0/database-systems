@@ -1,25 +1,50 @@
 #include "buffer.h"
 
 buffer_t ** buffers;
-int buf_size;
+int buffer_size;
+
+int buffer_init_buffer(int num_buf) {
+    int i;
+    buffer_size = num_buf;
+    buffers = (buffer_t **)malloc(buffer_size * sizeof(buffer_t *));
+    if (buffers == NULL) return -1;
+    for (i = 0; i < buffer_size; i++) {
+        buffers[i] = NULL;
+    }
+    return 0;
+}
+
+int buffer_shutdown_buffer() {
+    int i;
+    for (i = 0; i < buffer_size; i++) {
+        if (buffers[i] != NULL) {
+            file_write_page(buffers[i]->table_id,
+                            buffers[i]->page_num,
+                            &(buffers[i]->frame));
+            free(buffers[i]);
+        }
+    }
+    free(buffers);
+    return 0;
+}
 
 int get_first_LRU_idx() {
     int i;
-    for (i = 0; i < buf_size; i++)
+    for (i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL && buffers[i]->prev_LRU == NULL) return i;
     return -1;
 }
 
 int get_last_LRU_idx() {
     int i;
-    for (i = 0; i < buf_size; i++)
+    for (i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL && buffers[i]->next_LRU == NULL) return i;
     return -1;
 }
 
 int get_buffer_idx(int64_t table_id, pagenum_t page_num) {
     int i;
-    for (i = 0; i < buf_size; i++)
+    for (i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL &&
             buffers[i]->table_id == table_id &&
             buffers[i]->page_num == page_num)
@@ -32,7 +57,7 @@ int request_page(int64_t table_id, pagenum_t page_num) {
     int i, buffer_idx, last_LRU_idx;
     buffer_idx = get_buffer_idx(table_id, page_num);
     if (buffer_idx == -1) {
-        for (i = 0; i < buf_size; i++) {
+        for (i = 0; i < buffer_size; i++) {
             if (buffers[i] == NULL) {
                 buffer_idx = i;
                 buffers[buffer_idx] = (buffer_t *)malloc(sizeof(buffer_t));
@@ -41,7 +66,7 @@ int request_page(int64_t table_id, pagenum_t page_num) {
                 break;
             }
         }
-        if (i == buf_size) {
+        if (i == buffer_size) {
             for (victim = buffers[get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
                 if (victim->is_pinned == 0) break;
             }
@@ -87,6 +112,7 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
         if (header_buffer_idx != -1) {
             if (buffers[header_buffer_idx]->is_dirty)
                 file_write_page(table_id, 0, header);
+            buffers[header_buffer_idx]->is_dirty = 0;
         }
         page_num = file_alloc_page(table_id);
         if (header_buffer_idx != -1) {
