@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
-#include <hash_map>
+#include <unordered_map>
 
 typedef struct lock_t lock_t;
 
