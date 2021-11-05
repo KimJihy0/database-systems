@@ -26,6 +26,8 @@ int init_lock_table() {
 }
 
 lock_t* lock_acquire(int table_id, int64_t key) {
+    pthread_mutex_lock(&lock_table_latch);
+
     entry_t* entry = &(lock_table[std::make_pair(table_id, key)]);
 
     lock_t* lock_obj = (lock_t*)malloc(sizeof(lock_t));
@@ -33,7 +35,6 @@ lock_t* lock_acquire(int table_id, int64_t key) {
     lock_obj->sentinel = entry;
     lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
 
-    pthread_mutex_lock(&lock_table_latch);
     if (entry->tail != NULL) {
         entry->tail->next_lock = lock_obj;
         lock_obj->prev_lock = entry->tail;
@@ -47,15 +48,17 @@ lock_t* lock_acquire(int table_id, int64_t key) {
         entry->tail = lock_obj;
         lock_obj->next_lock = NULL;
     }
+
     pthread_mutex_unlock(&lock_table_latch);
     
     return lock_obj;
 }
 
 int lock_release(lock_t* lock_obj) {
+    pthread_mutex_lock(&lock_table_latch);
+
     entry_t* entry = lock_obj->sentinel;
 
-    pthread_mutex_lock(&lock_table_latch);
     if (lock_obj->next_lock != NULL) {
         entry->head = lock_obj->next_lock;
         lock_obj->next_lock->prev_lock = NULL;
@@ -65,17 +68,16 @@ int lock_release(lock_t* lock_obj) {
         entry->head = NULL;
         entry->tail = NULL;
     }
-    pthread_mutex_unlock(&lock_table_latch);
-
     free(lock_obj);
 
+    pthread_mutex_unlock(&lock_table_latch);
+    
     return 0;
 }
 
 /* ---To do---
  * entry_t 중복
  * NULL vs. nullptr
- * while (1) -> 이..상허다.
  * C++ 버전 확인
  * 
  * page.h 수정 (struct 전방선언 안해도됨)
