@@ -8,27 +8,27 @@ struct lock_t {
 };
 
 struct entry_t {
-    struct lock_t* tail = NULL;
-    struct lock_t* head = NULL;
+    struct lock_t* tail;
+    struct lock_t* head;
 };
 
 pthread_mutex_t lock_table_latch;
 struct pair_hash {
-    std::size_t operator() (const std::pair<int, int64_t> &pair) const {
-        return std::hash<int>()(pair.first) ^ std::hash<int64_t>()(pair.second);
+    std::size_t operator() (const std::pair<int64_t, int64_t> &pair) const {
+        return std::hash<int64_t>()(pair.first) ^ std::hash<int64_t>()(pair.second);
     }
 };
-std::unordered_map<std::pair<int, int64_t>, entry_t, pair_hash> lock_table;
+std::unordered_map<std::pair<int64_t, int64_t>, entry_t, pair_hash> lock_table;
 
 int init_lock_table() {
     lock_table_latch = PTHREAD_MUTEX_INITIALIZER;
     return 0;
 }
 
-lock_t* lock_acquire(int table_id, int64_t key) {
+lock_t* lock_acquire(int64_t table_id, int64_t key) {
     pthread_mutex_lock(&lock_table_latch);
 
-    entry_t* entry = &(lock_table[std::make_pair(table_id, key)]);
+    entry_t* entry = &(lock_table[{table_id, key}]);
 
     lock_t* lock_obj = (lock_t*)malloc(sizeof(lock_t));
     if (lock_obj == NULL) return NULL;
@@ -50,7 +50,6 @@ lock_t* lock_acquire(int table_id, int64_t key) {
     }
 
     pthread_mutex_unlock(&lock_table_latch);
-    
     return lock_obj;
 }
 
@@ -68,17 +67,14 @@ int lock_release(lock_t* lock_obj) {
         entry->head = NULL;
         entry->tail = NULL;
     }
+
     free(lock_obj);
 
     pthread_mutex_unlock(&lock_table_latch);
-    
     return 0;
 }
 
 /* ---To do---
  * entry_t 중복
  * NULL vs. nullptr
- * C++ 버전 확인
- * 
- * page.h 수정 (struct 전방선언 안해도됨)
  */
