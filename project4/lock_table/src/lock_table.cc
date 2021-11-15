@@ -73,8 +73,3 @@ int lock_release(lock_t* lock_obj) {
     pthread_mutex_unlock(&lock_table_latch);
     return 0;
 }
-
-/* ---To do---
- * entry_t 중복
- * NULL vs. nullptr
- */
