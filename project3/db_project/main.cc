@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <random>
 
-#define NUM_KEYS 10000
-#define NUM_BUFS 100
+#define NUM_KEYS 1000
+#define NUM_BUFS 3
 #define NUM_REPS 5
 
 using namespace std;

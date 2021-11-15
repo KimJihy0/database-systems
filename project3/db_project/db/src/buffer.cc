@@ -61,8 +61,6 @@ int request_page(int64_t table_id, pagenum_t page_num) {
             if (buffers[i] == NULL) {
                 buffer_idx = i;
                 buffers[buffer_idx] = (buffer_t *)malloc(sizeof(buffer_t));
-                buffers[buffer_idx]->next_LRU = NULL;
-                buffers[buffer_idx]->prev_LRU = NULL;
                 break;
             }
         }

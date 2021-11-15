@@ -149,11 +149,11 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
                             int64_t key, char* value, uint16_t val_size) {
     pagenum_t new_pgnum;
     page_t leaf, new_leaf;
+    int i, j, split, insertion_index, num_keys, total_size;
+    int64_t new_key;
+    uint16_t offset;
     slot_t temp_slots[65];
     char temp_values[3968];
-    int64_t new_key;
-    int insertion_index, split, i, j, num_keys, total_size;
-    uint16_t offset;
     
     file_read_page(table_id, leaf_pgnum, &leaf);
     
@@ -254,31 +254,32 @@ void insert_into_parent(int64_t table_id,
     file_read_page(table_id, left_pgnum, &left);
     file_read_page(table_id, right_pgnum, &right);
 
-    parent_pgnum = left.parent;
-
-    file_read_page(table_id, parent_pgnum, &parent);
-
     /* Case: new root.
      */
-    if (parent_pgnum == 0) {
+    if (left.parent == 0) {
         insert_into_new_root(table_id, left_pgnum, key, right_pgnum);
         return;
     }
 
-    /* Case: leaf or page.(Rest of function body)
+    /* Case: leaf or page.
+     * (Rest of function body)
      */
 
-    /* Find the index of parent's child to the left page.
-     */
+    parent_pgnum = left.parent;
+
+    file_read_page(table_id, parent_pgnum, &parent);
+
     left_index = get_left_index(table_id, parent_pgnum, left_pgnum);
     
-    /* Simple case: the new key fits into the node.
+    /* Case: the new key fits into the node.
+     * Nothing to do.
      */
     if (parent.num_keys < ENTRY_ORDER - 1) {
         insert_into_page(table_id, parent_pgnum, left_index, key, right_pgnum);
     }
 
-    /* Harder case: split a node by insertion rule.
+    /* Case: split a node by insertion rule.
+     * Need to be split.
      */
     else {
         insert_into_page_split(table_id, parent_pgnum, left_index, key, right_pgnum);
@@ -313,8 +314,8 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
                             int left_index, int64_t key, pagenum_t right_pgnum) {
     pagenum_t new_pgnum;
     page_t old_page, right, new_page, child;
-    int64_t k_prime;
     int i, j, split;
+    int64_t k_prime;
     pagenum_t temp_left_child;
     entry_t temp[ENTRY_ORDER];
     
@@ -477,8 +478,7 @@ int get_left_index(int64_t table_id, pagenum_t parent_pgnum, pagenum_t left_pgnu
     file_read_page(table_id, parent_pgnum, &parent);
     left_index = 0;
     if (parent.left_child == left_pgnum) return left_index;
-    while (left_index < parent.num_keys - 1 &&
-           parent.entries[left_index].child != left_pgnum) {
+    while (parent.entries[left_index].child != left_pgnum) {
         left_index++;
     }
     return ++left_index;
@@ -520,7 +520,7 @@ int db_delete(int64_t table_id, int64_t key) {
     /* Case: free space is under threshold.
      * Nothing to do.
      */
-    if (leaf.free_space < 2500) {
+    if (leaf.free_space < THRESHOLD) {
         return 0;
     }
 
@@ -664,7 +664,7 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
     /* Pull records from sibling
      * until its free space is under threshold.
      */
-    while (leaf.free_space >= 2500) {
+    while (leaf.free_space >= THRESHOLD) {
         src_index = (sibling_index != -1) ? sibling.num_keys - 1 : 0;
         dest_index = (sibling_index != -1) ? 0 : leaf.num_keys;
         src_size = sibling.slots[src_index].size;
@@ -950,10 +950,10 @@ int get_sibling_index(int64_t table_id, pagenum_t p_pgnum) {
     int sibling_index;
     file_read_page(table_id, p_pgnum, &p);
     file_read_page(table_id, p.parent, &parent);
-    for (sibling_index = 0; sibling_index < parent.num_keys; sibling_index++) {
-        if (parent.entries[sibling_index].child == p_pgnum) {
-            return sibling_index;
-        }
-    }
-    return -1;
+    sibling_index = -1;
+    if (parent.left_child == p_pgnum) return sibling_index;
+    do {
+        sibling_index++;
+    } while (parent.entries[sibling_index].child != p_pgnum);
+    return sibling_index;
 }

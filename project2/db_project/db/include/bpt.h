@@ -2,12 +2,12 @@
 #define DB_BPT_H_
 
 #include "file.h"
-#include <stdint.h>
 
 #define HEADER_SIZE 128
 #define FREE_SPACE 3968
 #define SLOT_SIZE 12
 #define ENTRY_ORDER 249
+#define THRESHOLD 2500
 
 int64_t open_table(char* pathname);
 

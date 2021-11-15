@@ -44,18 +44,16 @@ int64_t file_open_table_file(const char * pathname) {
 	strcpy(new_table.pathname, pathname);
 	new_table.fd = fd;
 	int64_t table_id = 0;
-	int i;
-	for (i = 0; i < strlen(pathname); i++)
+	for (int i = 0; i < strlen(pathname); i++)
 		table_id += pathname[i];
-	i = table_id % NUM_BUCKETS;
-	while (strlen(tables[i].pathname) != 0) {
-        if (!strcmp(tables[i].pathname, pathname)) {
+	while (strlen(tables[table_id % NUM_BUCKETS].pathname) != 0) {
+        if (!strcmp(tables[table_id % NUM_BUCKETS].pathname, pathname)) {
 			close(fd);
 			return -1;
 		}
-		i = (++table_id) % NUM_BUCKETS;
+        table_id++;
 	}
-	tables[i] = new_table;
+	tables[table_id % NUM_BUCKETS] = new_table;
 	return table_id;
 }
 
