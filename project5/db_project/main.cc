@@ -24,6 +24,7 @@ void print_tree_from_disk(int64_t table_id);
 void print_LRUs();
 void print_buffers();
 void print_freepg_list(int64_t table_id);
+pagenum_t get_root_num(int64_t table_id);
 
 char* val(int key);
 int size();
@@ -464,4 +465,13 @@ void print_freepg_list(int64_t table_id) {
         buffer_write_page(table_id, temp, &page);
     }
     printf("\n");
+}
+
+pagenum_t get_root_num(int64_t table_id) {
+    page_t * header;
+    int header_buffer_idx;
+    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    pagenum_t root_num = header->root_num;
+    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
+    return root_num;
 }

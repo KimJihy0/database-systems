@@ -29,7 +29,4 @@ void buffer_free_page(int64_t table_id, pagenum_t page_num);
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest);
 void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src);
 
-pagenum_t get_root_num(int64_t table_id);
-void set_root_num(int64_t table_id, pagenum_t root_num);
-
 #endif

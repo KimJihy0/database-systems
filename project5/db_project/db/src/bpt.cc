@@ -20,7 +20,7 @@ int64_t open_table(char * pathname) {
 // SEARCH
 
 int db_find(int64_t table_id, int64_t key,
-            char * ret_val = NULL, uint16_t * val_size = NULL) {
+            char * ret_val = NULL, uint16_t * val_size = NULL, int trx_id = 0) {
     pagenum_t p_pgnum;
     page_t * p;
     int p_buffer_idx;
@@ -35,7 +35,7 @@ int db_find(int64_t table_id, int64_t key,
         if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         return -1;
     }
-    if (ret_val == NULL || val_size == NULL) {
+    if (ret_val == NULL || val_size == NULL || trx_id == 0) {
         if (p_buffer_idx != -1) buffers[p_buffer_idx]->is_pinned--;
         return 1;
     }
@@ -47,10 +47,12 @@ int db_find(int64_t table_id, int64_t key,
 
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
     pagenum_t p_pgnum;
-    page_t * p;
-    int p_buffer_idx;
+    page_t * p, * header;
+    int p_buffer_idx, header_buffer_idx;
     int i;
-    p_pgnum = get_root_num(table_id);
+    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    p_pgnum = header->root_num;
+    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
     if (p_pgnum == 0) return 0;
     p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     while (!p->is_leaf) {
@@ -67,17 +69,28 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
     return p_pgnum;
 }
 
+// UPDATE
+
+int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_size,
+              uint16_t * old_val_size, int trx_id) {
+
+}
+
 // INSERTION
 
 int db_insert(int64_t table_id, int64_t key, char * value, uint16_t val_size) {
-    pagenum_t leaf_pgnum;
-    page_t * leaf;
-    int leaf_buffer_idx;
+    pagenum_t leaf_pgnum, root_pgnum;
+    page_t * leaf, * header;
+    int leaf_buffer_idx, header_buffer_idx;
     int free_space;
 
     if (db_find(table_id, key) == 1) return -1;
 
-    if (get_root_num(table_id) == 0) {
+    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    root_pgnum = header->root_num;
+    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
+
+    if (root_pgnum == 0) {
         start_tree(table_id, key, value, val_size);
         return 0;
     }
@@ -316,11 +329,12 @@ void insert_into_page_split(int64_t table_id, pagenum_t old_pgnum,
 
 void start_tree(int64_t table_id, int64_t key, char * value, uint16_t val_size) {
     pagenum_t root_pgnum;
-    page_t * root;
+    page_t * root, * header;
 
     root_pgnum = make_leaf(table_id);
 
     buffer_read_page(table_id, root_pgnum, &root);
+    buffer_read_page(table_id, 0, &header);
 
     root->slots[0].key = key;
     root->slots[0].size = val_size;
@@ -329,21 +343,23 @@ void start_tree(int64_t table_id, int64_t key, char * value, uint16_t val_size) 
     root->free_space -= (SLOT_SIZE + val_size);
     root->parent = 0;
     root->num_keys++;
-    set_root_num(table_id, root_pgnum);
+    header->root_num = root_pgnum;
 
     buffer_write_page(table_id, root_pgnum, &root);
+    buffer_write_page(table_id, 0, &header);
 }
 
 void insert_into_new_root(int64_t table_id,
                           pagenum_t left_pgnum, int64_t key, pagenum_t right_pgnum) {
     pagenum_t root_pgnum;
-    page_t * left, * right, * root;
+    page_t * left, * right, * root, * header;
     
     root_pgnum = make_page(table_id);
 
     buffer_read_page(table_id, left_pgnum, &left);
     buffer_read_page(table_id, right_pgnum, &right);
     buffer_read_page(table_id, root_pgnum, &root);
+    buffer_read_page(table_id, 0, &header);
 
     root->left_child = left_pgnum;
     root->entries[0].key = key;
@@ -352,11 +368,12 @@ void insert_into_new_root(int64_t table_id,
     root->parent = 0;
     left->parent = root_pgnum;
     right->parent = root_pgnum;
-    set_root_num(table_id, root_pgnum);
+    header->root_num = root_pgnum;
 
     buffer_write_page(table_id, left_pgnum, &left);
     buffer_write_page(table_id, right_pgnum, &right);
     buffer_write_page(table_id, root_pgnum, &root);
+    buffer_write_page(table_id, 0, &header);
 }
 
 pagenum_t make_leaf(int64_t table_id) {
@@ -773,20 +790,27 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
 }
 
 void end_tree(int64_t table_id, pagenum_t root_pgnum) {
-    set_root_num(table_id, 0);
+    page_t * header;
+    buffer_read_page(table_id, 0, &header);
+
+    header->root_num = 0;
+
+    buffer_write_page(table_id, 0, &header);
     buffer_free_page(table_id, root_pgnum);
 }
 
 void adjust_root(int64_t table_id, pagenum_t root_pgnum) {
-    page_t * root, * new_root;
+    page_t * root, * new_root, * header;
     int root_buffer_idx;
 
     root_buffer_idx = buffer_read_page(table_id, root_pgnum, &root);
     buffer_read_page(table_id, root->left_child, &new_root);
+    buffer_read_page(table_id, 0, &header);
 
     new_root->parent = 0;
-    set_root_num(table_id, root->left_child);
+    header->root_num = root->left_child;
 
+    buffer_write_page(table_id, 0, &header);
     buffer_write_page(table_id, root->left_child, &new_root);
     if (root_buffer_idx != -1) buffers[root_buffer_idx]->is_pinned--;
 

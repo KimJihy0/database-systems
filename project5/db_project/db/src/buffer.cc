@@ -166,19 +166,3 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * sr
         free(*src);
     }
 } 
-
-pagenum_t get_root_num(int64_t table_id) {
-    page_t * header;
-    int header_buffer_idx;
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    pagenum_t root_num = header->root_num;
-    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
-    return root_num;
-}
-
-void set_root_num(int64_t table_id, pagenum_t root_num) {
-    page_t * header;
-    buffer_read_page(table_id, 0, &header);
-    header->root_num = root_num;
-    buffer_write_page(table_id, 0, &header);
-} 
