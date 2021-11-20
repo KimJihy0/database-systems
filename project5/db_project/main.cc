@@ -7,8 +7,8 @@
 #include <random>
 
 #define NUM_KEYS 10000
-#define NUM_BUFS 200
-#define NUM_REPS 5
+#define NUM_BUFS 10
+#define NUM_REPS 3
 
 using namespace std;
 
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
             memset(value, 0x00, 112);
             val_size = 0;
             // printf("find %4d\n", i);
-            if(db_find(table_id, i, value, &val_size) != 0) goto func_exit;
+            if(db_find(table_id, i, value, &val_size, 1) != 0) goto func_exit;
             // else if (size(i) != val_size ||
             // 		 val(i) != std::string(value, val_size)) {
             // 	printf("value dismatched\n");
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
             val_size = 0;
-            if (db_find(table_id, i, value, &val_size) == 0) goto func_exit;
+            if (db_find(table_id, i, value, &val_size, 1) == 0) goto func_exit;
         }
         printf("\t[FIND END AGAIN]\n");
 
@@ -231,7 +231,7 @@ void print_pgnum(int64_t table_id, pagenum_t page_num) {
 	page_t* page;
 	int idx = buffer_read_page(table_id, page_num, &page);
 	print_page(page_num, *page);
-	if (idx != -1) buffers[idx]->is_pinned--;
+	pthread_mutex_unlock(&(buffers[idx]->page_latch));
 }
 
 void print_pgnum_from_disk(int64_t table_id, pagenum_t page_num) {
@@ -253,7 +253,7 @@ void print_all(int64_t table_id) {
     int root_idx = buffer_read_page(table_id, root_num, &root);
     print_page(root_num, *root);
     if (root->is_leaf) {
-        if (root_idx != -1) buffers[root_idx]->is_pinned--;
+        pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
         return;
     }
 
@@ -264,12 +264,12 @@ void print_all(int64_t table_id) {
     print_page(temp_num, *page); 
     for (int i = 0; i < root->num_keys; i++) {
         temp_num = root->entries[i].child;
-		if (temp_idx != -1) buffers[temp_idx]->is_pinned--;
+		pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
         temp_idx = buffer_read_page(table_id, temp_num, &page);
         print_page(temp_num, *page);
     }
-	if (root_idx != -1) buffers[root_idx]->is_pinned--;
-	if (temp_idx != -1) buffers[temp_idx]->is_pinned--;
+	pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
+	pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
 }
 
 void print_all_from_disk(int64_t table_id) {
@@ -316,11 +316,11 @@ int path_to_root(int64_t table_id, pagenum_t child_num) {
 	int c_idx = buffer_read_page(table_id, c_num, &c);
 	while (c->parent != 0) {
 		c_num = c->parent;
-		if (c_idx != -1) buffers[c_idx]->is_pinned--;
+		pthread_mutex_unlock(&(buffers[c_idx]->page_latch));
 		c_idx = buffer_read_page(table_id, c_num, &c);
 		length++;
 	}
-	if (c_idx != -1) buffers[c_idx]->is_pinned--;
+	pthread_mutex_unlock(&(buffers[c_idx]->page_latch));
 	return length;
 }
 
@@ -345,7 +345,11 @@ void print_tree(int64_t table_id) {
 		parent_idx = buffer_read_page(table_id, p->parent, &parent);
 
 		if (p->parent != 0 && p_pgnum == parent->left_child) {
+            pthread_mutex_unlock(&(buffers[p_idx]->page_latch));
+            pthread_mutex_unlock(&(buffers[parent_idx]->page_latch));
 			new_rank = path_to_root(table_id, p_pgnum);
+            pthread_mutex_lock(&(buffers[p_idx]->page_latch));
+            pthread_mutex_lock(&(buffers[parent_idx]->page_latch));
 			if (new_rank != rank) {
 				rank = new_rank;
 				printf("\n");
@@ -360,8 +364,8 @@ void print_tree(int64_t table_id) {
 		}
 		printf("| ");
 
-		if (p_idx != -1) buffers[p_idx]->is_pinned--;
-		if (parent_idx != -1) buffers[parent_idx]->is_pinned--;
+		pthread_mutex_unlock(&(buffers[p_idx]->page_latch));
+		pthread_mutex_unlock(&(buffers[parent_idx]->page_latch));
 	}
 	printf("\n");
 
@@ -444,7 +448,7 @@ void print_buffers() {
         print_page(buffers[i]->page_num, buffers[i]->frame);
         printf("\n");
         printf("pagenum: %ld\n", buffers[i]->page_num);
-        printf("is_pinned: %d\n", buffers[i]->is_pinned);
+        printf("page_latch: %d\n", (buffers[i]->page_latch).__data.__lock);
         printf("\n");
     }
 }
@@ -472,6 +476,6 @@ pagenum_t get_root_num(int64_t table_id) {
     int header_buffer_idx;
     header_buffer_idx = buffer_read_page(table_id, 0, &header);
     pagenum_t root_num = header->root_num;
-    if (header_buffer_idx != -1) buffers[header_buffer_idx]->is_pinned--;
+    pthread_mutex_unlock(&(buffers[header_buffer_idx]->page_latch));
     return root_num;
 }

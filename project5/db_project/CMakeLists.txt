@@ -23,6 +23,7 @@ option(USE_GOOGLE_TEST "Use GoogleTest for testing" ON)
 if(USE_DB)
   add_subdirectory(db)
   list(APPEND EXTRA_LIBS db)
+  list(APPEND EXTRA_LIBS pthread)
 endif()
 
 # GoogleTest
@@ -37,4 +38,3 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EXTRA_LIBS})
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
   "${PROJECT_BINARY_DIR}"
   )
-

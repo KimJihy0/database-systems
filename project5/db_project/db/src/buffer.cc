@@ -2,6 +2,7 @@
 
 buffer_t ** buffers;
 int buffer_size;
+pthread_mutex_t buffer_mng_latch;
 
 int buffer_init_buffer(int num_buf) {
     int i;
@@ -11,6 +12,7 @@ int buffer_init_buffer(int num_buf) {
     for (i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
+    pthread_mutex_init(&buffer_mng_latch, 0);
     return 0;
 }
 
@@ -53,6 +55,8 @@ int buffer_get_buffer_idx(int64_t table_id, pagenum_t page_num) {
 }
 
 int buffer_request_page(int64_t table_id, pagenum_t page_num) {
+    pthread_mutex_lock(&buffer_mng_latch);
+
     buffer_t * victim;
     int i, buffer_idx, last_LRU_idx;
     buffer_idx = buffer_get_buffer_idx(table_id, page_num);
@@ -60,30 +64,34 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         for (i = 0; i < buffer_size; i++) {
             if (buffers[i] == NULL) {
                 buffer_idx = i;
-                buffers[buffer_idx] = (buffer_t *)malloc(sizeof(buffer_t));
+                buffers[buffer_idx] = new buffer_t;
                 buffers[buffer_idx]->next_LRU = NULL;
                 buffers[buffer_idx]->prev_LRU = NULL;
+                buffers[buffer_idx]->is_dirty = 0;
+                pthread_mutex_init(&(buffers[buffer_idx]->page_latch), 0);
+                pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
                 break;
             }
         }
         if (i == buffer_size) {
             for (victim = buffers[buffer_get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
-                if (victim->is_pinned == 0) break;
+                if (pthread_mutex_trylock(&(victim->page_latch)) != EBUSY) break;
             }
             if (victim == NULL) return -1;
             buffer_idx = buffer_get_buffer_idx(victim->table_id, victim->page_num);
-            if (buffers[buffer_idx]->is_dirty) {
+            if (buffers[buffer_idx]->is_dirty != 0) {
                 file_write_page(buffers[buffer_idx]->table_id,
                                 buffers[buffer_idx]->page_num,
                                 &(buffers[buffer_idx]->frame));
+                buffers[buffer_idx]->is_dirty = 0;
             }
         }
         file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         buffers[buffer_idx]->table_id = table_id;
         buffers[buffer_idx]->page_num = page_num;
-        buffers[buffer_idx]->is_dirty = 0;
-        buffers[buffer_idx]->is_pinned = 0;
     }
+    else pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
+
     if (buffers[buffer_idx]->prev_LRU)
         buffers[buffer_idx]->prev_LRU->next_LRU = buffers[buffer_idx]->next_LRU;
     if (buffers[buffer_idx]->next_LRU)
@@ -100,6 +108,8 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         buffers[buffer_idx]->next_LRU = NULL;
         buffers[buffer_idx]->prev_LRU = NULL;
     }
+
+    pthread_mutex_unlock(&buffer_mng_latch);
     return buffer_idx;
 }
 
@@ -117,14 +127,14 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
         page_num = file_alloc_page(table_id);
         if (header_buffer_idx != -1) {
             file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
-            buffers[header_buffer_idx]->is_pinned--;
+            pthread_mutex_unlock(&(buffers[header_buffer_idx]->page_latch));
         }
         return page_num;
     }
     page_num = header->next_frpg;
     alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
     header->next_frpg = alloc->next_frpg;
-    if (alloc_buffer_idx != -1) buffers[alloc_buffer_idx]->is_pinned--;
+    pthread_mutex_unlock(&(buffers[alloc_buffer_idx]->page_latch));
     buffer_write_page(table_id, 0, &header);
     return page_num;
 }
@@ -140,29 +150,13 @@ void buffer_free_page(int64_t table_id, pagenum_t page_num) {
 }
 
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest) {
-    int buffer_idx;
-    buffer_idx = buffer_request_page(table_id, page_num);
-    if (buffer_idx != -1) {
-        buffers[buffer_idx]->is_pinned++;
-        *dest = &(buffers[buffer_idx]->frame);
-    }
-    else {
-        page_t * page = (page_t *)malloc(sizeof(page_t));
-        file_read_page(table_id, page_num, page); 
-        *dest = page;
-    }
+    int buffer_idx = buffer_request_page(table_id, page_num);
+    *dest = &(buffers[buffer_idx]->frame);
     return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src) {
-    int buffer_idx;
-    buffer_idx = buffer_get_buffer_idx(table_id, page_num);
-    if (buffer_idx != -1) {
-        buffers[buffer_idx]->is_dirty = 1;
-        buffers[buffer_idx]->is_pinned--;
-    }
-    else {
-        file_write_page(table_id, page_num, *src);
-        free(*src);
-    }
-} 
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src, int flag) {
+    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
+    buffers[buffer_idx]->is_dirty = 1;
+    pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
+}
