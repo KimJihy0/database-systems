@@ -60,11 +60,11 @@ int search(int64_t table_id, int trx_id, int64_t key) {
     uint16_t old_size;
     int result;
 
-    std::cout << "thread " << trx_id << " : key " <<  key << " 검색 시도!\n";
+    // std::cout << "thread " << trx_id << " : key " <<  key << " 검색 시도!\n";
     if(db_find(table_id, key, ret_val, &old_size, trx_id) != 0) {
-        std::cout << "thread "<< trx_id << " : ABORT 발생\n";
+        std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
     }
-    else std::cout << "thread " << trx_id << " : key " <<  key << " 검색 성공!\n\n";
+    // else std::cout << "thread " << trx_id << " : key " <<  key << " 검색 성공!\n\n";
     return 0;
 }
 
@@ -73,61 +73,49 @@ int update(int64_t table_id, int trx_id, int64_t key) {
     uint16_t old_size;
     int result;
 
-    std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 시도!\n";
+    // std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 시도!\n";
     if(db_update(table_id, key, val, 10, &old_size, trx_id) != 0) {
-        std::cout << "thread "<< trx_id << " : ABORT 발생\n";
+        std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
     }
-    else std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 성공!\n\n";
+    // else std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 성공!\n\n";
     return 0;
 }
 
 
 void* thread1(void* arg)
 {
-    int randTemp, a, b;
-    int* tid = (int*)arg;
-    int txid = trx_begin();
-    std::cout << "Thread1 TXID = " << txid << std::endl;
+    int a;
+    int* table_id = (int*)arg;
     
-    while(1) {
+    int trx_id = trx_begin();
+    while (1) {
         a = rand()%4;
-        if(a==0) {
-            search(*tid, txid, rand()%100);
-        } else if(a==1) {
-            update(*tid, txid, rand()%100);
-        } else if(a==2) {
-            std::cout << 2 << " sleep!" << '\n';
-            sleep(3);
-        } else {
-            trx_commit(txid);
-            return nullptr;
-        }
+        if(a==0) search(*table_id, trx_id, rand() % NUM_KEYS);
+        else if(a==1) update(*table_id, trx_id, rand() % NUM_KEYS);
+        else if(a==2) sleep(1);
+        else break;
     }
+    trx_commit(trx_id);
 
     return nullptr;
 }
 
 void* thread2(void* arg)
 {
-    int randTemp, a, b;
-    int* tid = (int*)arg;
-    int txid = trx_begin();
-    std::cout << "Thread2 TXID = " << txid << std::endl;
-    
-    while(1) {
+    int a;
+    int* table_id = (int*)arg;
+
+    int trx_id = trx_begin();
+    int T = 200;
+    while(T--) {
         a = rand()%10;
-        if(a<4) {
-            search(*tid, txid, rand()%100);
-        } else if(a<8) {
-            update(*tid, txid, rand()%100);
-        } else if(a<9) {
-            std::cout << 2 << " sleep!" << '\n';
-            sleep(3);
-        } else {
-            trx_commit(txid);
-            return nullptr;
-        }
+        if(a<4) search(*table_id, trx_id, rand() % NUM_KEYS);
+        else if(a<8) update(*table_id, trx_id, rand() % NUM_KEYS);
+        else if(a<9) sleep(1);
+        // else break;
+        else continue;
     }
+    trx_commit(trx_id);
 
     return nullptr;
 }

@@ -144,12 +144,12 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
                             #endif
-            if (lock_obj->lock_mode == SHARED && lock_mode == EXCLUSIVE) {
-                            #if verbose
-                            printf("but conflict\n");
-                            #endif
-                // return -1;
-            }
+            // if (lock_obj->lock_mode == SHARED && lock_mode == EXCLUSIVE) {
+            //                 #if verbose
+            //                 printf("but conflict\n");
+            //                 #endif
+            //     // return -1;
+            // }
             return 0;
         }
         lock_obj = lock_obj->next_lock;
@@ -258,6 +258,7 @@ int lock_release(lock_t* lock_obj) {
  * project4 구조 원상복귀
  * broadcast -> signal
  * lock_acquire() 1,2번째 while문 확인.
+ * trx 관련 trx_latch
  * 
  * max_trx_id
  * LRU -> head, tail로 구현 가능한지 확인.
@@ -265,7 +266,6 @@ int lock_release(lock_t* lock_obj) {
  * layer : file->buffer->trx->bpt
  * while() { pthread_cond_wait } ?
  * cmake gdb
- * trx 관련 trx_latch
  * log latch
  * lock_acquire()에서 deadlock detection해도 되는지. NULL return 가능한지.
  * pathname?????
@@ -295,5 +295,9 @@ int lock_release(lock_t* lock_obj) {
  * record_id == key?
  * trx_entry_t 없애고 simple linked-list로 수정
  * head, tail -> dummy node 가능?
+ * 
+ * ---Recent modification---
+ * small deadlock 제거
+ * 
  * 
  */ 
