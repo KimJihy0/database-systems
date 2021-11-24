@@ -32,11 +32,12 @@ struct lock_t {
 };
 
 struct log_t {
-    log_t(int64_t table_id, pagenum_t page_num, int64_t key) :
-        table_id(table_id), page_num(page_num), key(key) {}
+    log_t(int64_t table_id, pagenum_t page_num, uint16_t offset, uint16_t size) :
+        table_id(table_id), page_num(page_num), size(offset), offset(size) {}
     int64_t table_id;
     pagenum_t page_num;
-    int64_t key;
+    uint16_t offset;
+    uint16_t size;
     char old_value[108];
     char new_value[108];
 };

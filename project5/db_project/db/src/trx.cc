@@ -32,7 +32,11 @@ int trx_begin() {
 }
 
 int trx_commit(int trx_id) {
-    if (trx_table[trx_id]->trx_state == ABORTED) return 0;
+    pthread_mutex_lock(&trx_latch);
+    int trx_state = trx_table[trx_id]->trx_state;
+    pthread_mutex_unlock(&trx_latch);
+
+    if (trx_state == ABORTED) return -1;
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
@@ -41,8 +45,10 @@ int trx_commit(int trx_id) {
                             #if verbose
                             printf("trx_commit(%d) start\n", trx_id);
                             #endif
-
+    pthread_mutex_lock(&trx_latch);
     lock_t* lock_obj = trx_table[trx_id]->head;
+    pthread_mutex_unlock(&trx_latch);
+
     lock_t* del_obj;
     while (lock_obj != NULL) {
         lock_release(lock_obj);
@@ -50,9 +56,12 @@ int trx_commit(int trx_id) {
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
     }
+
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = COMMITTED;
+    pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
                             printf("trx_commit(%d) end\n", trx_id);
@@ -62,7 +71,7 @@ int trx_commit(int trx_id) {
 }
 
 int trx_abort(int trx_id) {
-    if (trx_table[trx_id]->trx_state == ABORTED) return 0;
+    // if (trx_table[trx_id]->trx_state == ABORTED) return 0;
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_abort(%d)\n", trx_id);
     #endif
@@ -71,19 +80,19 @@ int trx_abort(int trx_id) {
                             printf("trx_abort(%d) start\n", trx_id);
                             #endif
 
+    pthread_mutex_lock(&trx_latch);
     page_t * p;
-    int i;
     log_t* log;
     while (!(trx_table[trx_id]->logs.empty())) {
         log = &(trx_table[trx_id]->logs.top());
         buffer_read_page(log->table_id, log->page_num, &p);
-        for (i = 0; i < p->num_keys; i++) if (p->slots[i].key == log->key) break;
-        memcpy(p->values + p->slots[i].offset - 128, log->old_value, p->slots[i].size);
+        memcpy(p->values + log->offset, log->old_value, log->size);
         buffer_write_page(log->table_id, log->page_num, &p);
         trx_table[trx_id]->logs.pop();
     }
-   
     lock_t* lock_obj = trx_table[trx_id]->head;
+    pthread_mutex_unlock(&trx_latch);
+   
     lock_t* del_obj;
     while (lock_obj != NULL) {
         lock_release(lock_obj);
@@ -91,9 +100,12 @@ int trx_abort(int trx_id) {
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
     }
+
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = ABORTED;
+    pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
                             printf("trx_abort(%d) end\n", trx_id);
@@ -202,8 +214,10 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_entry->tail = lock_obj;
     }
 
+    pthread_mutex_lock(&trx_latch);
     lock_obj->trx_next_lock = trx_entry->head;
     trx_entry->head = lock_obj;
+    pthread_mutex_unlock(&trx_latch);
 
     // SET_BIT(lock_obj->wait_bitmap, idx);
 
@@ -213,7 +227,9 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         while (cur_obj != lock_obj) {
             if (cur_obj->record_id == key &&
                     (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
+                pthread_mutex_lock(&trx_latch);
                 trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
+                pthread_mutex_unlock(&trx_latch);
                                 #if verbose
                                 if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, key);
                                 else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, table_id, key);
@@ -228,7 +244,10 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                                 // print_waits_for_graph();
                                 // print_locks();
                                 #endif
+                pthread_mutex_lock(&trx_latch);
                 trx_entry->waits_for_trx_id = 0;
+                pthread_mutex_unlock(&trx_latch);
+
                 break;
             }
             cur_obj = cur_obj->next_lock;
@@ -253,12 +272,9 @@ int lock_release(lock_t* lock_obj) {
 }
 
 /* ---To do---
- * 테스트코드 만들어야 하나?
- * log->key(X) log->offset(O)
  * project4 구조 원상복귀
  * broadcast -> signal
  * lock_acquire() 1,2번째 while문 확인.
- * trx 관련 trx_latch
  * 
  * max_trx_id
  * LRU -> head, tail로 구현 가능한지 확인.
@@ -277,6 +293,8 @@ int lock_release(lock_t* lock_obj) {
  * ACTIVE, COMMITTED, ABORTED : 0,1,2 or 1,2,3
  * 
  * ---Done---
+ * log->key(X) log->offset(O)
+ * trx 관련 trx_latch
  * trx_abort()가 index manager에 있어서 찝찝한 상태.
  * upgradable lock(U_lock)
  * undo할 때 lock?

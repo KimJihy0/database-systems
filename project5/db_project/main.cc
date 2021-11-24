@@ -10,7 +10,7 @@
 #include <time.h>
 
 #define NUM_KEYS    100
-#define NUM_BUFS    5
+#define NUM_BUFS    3
 #define size(n)     ((n) % 63 + 46)                 
 
 // using namespace std;
@@ -27,7 +27,7 @@ void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
 
-#if 1
+#if 0
 int main() {
     srand(time(__null));
 
