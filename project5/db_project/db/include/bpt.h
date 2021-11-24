@@ -1,11 +1,11 @@
 #ifndef DB_BPT_H_
 #define DB_BPT_H_
 
-#include "buffer.h"
+#include "trx.h"
 
 #define HEADER_SIZE 128
 #define FREE_SPACE 3968
-#define SLOT_SIZE 12
+#define SLOT_SIZE 16
 #define ENTRY_ORDER 249
 #define THRESHOLD 2500
 
@@ -21,7 +21,6 @@ int db_find(int64_t table_id, int64_t key, char * ret_val, uint16_t * val_size, 
 int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_size,
               uint16_t * old_val_size, int trx_id);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
-int trx_abort(int trx_id);
 
 // INSERTION
 

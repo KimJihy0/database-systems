@@ -1,187 +1,155 @@
 #include "bpt.h"
 
-#include <queue>
-#include <vector>
-#include <iterator>
-#include <algorithm>
 #include <random>
+#include <algorithm>
+#include <vector>
+#include <assert.h>
+#include <unistd.h>
+#include <time.h>
+#include <iostream>
+#include <time.h>
 
-#define NUM_KEYS 10000
-#define NUM_BUFS 10
-#define NUM_REPS 3
+#define NUM_KEYS    10000
+#define NUM_BUFS    400
+#define size(n)     ((n) % 63 + 46)                 
 
-using namespace std;
+// using namespace std;
 
+static int count = 0;
+
+int search(int64_t table_id, int trx_id, int64_t key);
+int update(int64_t table_id, int trx_id, int64_t key);
+void* thread1(void* arg);
+void* thread2(void* arg);
+void* thread3(void* arg);
+int create_db(const char* pathname);
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num); 
-void print_pgnum_from_disk(int64_t table_id, pagenum_t page_num); 
-void print_all(int64_t table_id);
-void print_all_from_disk(int64_t table_id);
-int path_to_root(int64_t table_id, pagenum_t child_num);
-void print_tree(int64_t table_id);
-int path_to_root_from_disk(int64_t table_id, pagenum_t child_num);
-void print_tree_from_disk(int64_t table_id);
-void print_LRUs();
-void print_buffers();
-void print_freepg_list(int64_t table_id);
-pagenum_t get_root_num(int64_t table_id);
-
-char* val(int key);
-int size();
-int size(int key);
 
 #if 1
-int main(int argc, char** argv) {
-	vector<int> keys;
-	for (int i = 0; i < NUM_KEYS; i++) {
-		keys.push_back(i);
-	}
-	random_device rd;
-	mt19937 gen(rd());
-	default_random_engine rng(rd());
-	char value[112];
-	uint16_t val_size;
+int main() {
+    srand(time(__null));
 
-	printf("[TEST START]\n\n");
-    printf("[NUM_KEYS : %7d] \n", NUM_KEYS);
-    printf("[NUM_BUFS : %7d] \n", NUM_BUFS);
-    printf("[NUM_REPS : %7d] \n", NUM_REPS);
-    printf("\n");
+    init_db(NUM_BUFS);
+    int64_t table_id = create_db("table0");
+    printf("file creation complete(%ld).\n", table_id);
 
-    printf("[INIT START]\n");
-	init_db(NUM_BUFS);
-    printf("[INIT END]\n\n");
+    print_pgnum(table_id, 2559);
 
-    printf("[OPEN START]\n");
-	int64_t table_id = open_table((char*)"table0");
-    printf("[OPEN END]\n\n");
-
-    for (int j = 0; j < NUM_REPS; j++) {
-        shuffle(keys.begin(), keys.end(), rng);
-
-        printf("[REP%2d] ", j);
-
-        printf("[INSERT START]\n");
-        for (const auto& i : keys) {
-            // printf("insert %4d\n", i);
-            if (db_insert(table_id, i, val(i), size(i)) != 0) goto func_exit;
-        }
-        printf("\t[INSERT END]\n");
-
-        printf("\t[FIND START]\n");
-        for (const auto& i : keys) {
-            memset(value, 0x00, 112);
-            val_size = 0;
-            // printf("find %4d\n", i);
-            if(db_find(table_id, i, value, &val_size, 1) != 0) goto func_exit;
-            // else if (size(i) != val_size ||
-            // 		 val(i) != std::string(value, val_size)) {
-            // 	printf("value dismatched\n");
-            // 	goto func_exit;
-            // }
-        }
-        printf("\t[FIND END]\n");
-
-        // print_tree(table_id);
-        // printf("\n");
-
-        printf("\t[DELETE START]\n");
-        for (const auto& i : keys) {
-            // printf("delete %4d\n", i);
-            if (db_delete(table_id, i) != 0) goto func_exit;
-        }
-        printf("\t[DELETE END]\n");
-
-        printf("\t[FIND START AGAIN]\n");
-        for (const auto& i : keys) {
-            memset(value, 0x00, 112);
-            val_size = 0;
-            if (db_find(table_id, i, value, &val_size, 1) == 0) goto func_exit;
-        }
-        printf("\t[FIND END AGAIN]\n");
-
-        // print_tree(table_id);
-        // printf("\n");
-    }
-
-    printf("\n[TEST END]\n\n");    
-
-	func_exit:
-	printf("[SHUTDOWN START]\n");
-    // print_freepg_list(table_id);
-    // printf("\n");
-	// print_tree(table_id);
-    // printf("\n");
-	if (shutdown_db() != 0) {
-		return 0;
-	}
-	printf("[SHUTDOWN END]\n");
-
-    // print_tree_from_disk(table_id);
-
-	return 0;
-}
-#endif
-
-
-#if 0
-void test1_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
-    page_t * page;
-    page = (page_t *)malloc(sizeof(page_t));
-    file_read_page(table_id, page_num, page);
-    *dest_page = page;
-}
-void test1_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src_page) {
-    file_write_page(table_id, page_num, *src_page);
-}
-void test2_read_page(int64_t table_id, pagenum_t page_num, page_t** dest_page) {
-	*dest_page = &(buffers[0]->frame);
-}
-int main(int argc, char** argv) {
-	init_db(200);
-	int64_t table_id = open_table((char*)"test_table");
-
-	page_t* header;
-    page_t* temp;
-	
-	test1_read_page(table_id, 0, &header);
-	printf("header->next_frpg: %ld\n", header->next_frpg);
-	printf("header->num_pages: %ld\n", header->num_pages);
-	printf("header->root_num: %ld\n", header->root_num);
-    header->next_frpg = 1252;
-
-    // test1_read_page(table_id, 1, &temp);
+    pthread_t tx1, tx2, tx3;
+    pthread_create(&tx1, 0, thread1, &table_id);
     
-    test1_write_page(table_id, 0, &header);
+    for(int i = 0; i < 100000000; ++i);
+    pthread_create(&tx2, 0, thread2, &table_id);
 
-    header->next_frpg = 1111;
+    pthread_join(tx1, NULL);
+    pthread_join(tx2, NULL);
 
-    // test1_read_page(table_id, 0, &header);
+    print_pgnum(table_id, 2559);
 
-	printf("header->next_frpg: %ld\n", header->next_frpg);
-	printf("header->num_pages: %ld\n", header->num_pages);
-	printf("header->root_num: %ld\n", header->root_num);
-
-	// buffers[0] = (buffer_t*)malloc(sizeof(buffer_t));
-	// file_read_page(table_id, 0, &(buffers[0]->frame));
-
-	// page_t* leaf;
-	// leaf = (page_t*)malloc(sizeof(page_t));
-	// test2_read_page(table_id, 0, &leaf);
-	
-
-	// printf("leaf->next_frpg: %ld\n", leaf->next_frpg);
-	// printf("leaf->num_pages: %ld\n", leaf->num_pages);
-	// printf("leaf->root_num: %ld\n", leaf->root_num);
-
-	// leaf->next_frpg = 1252;
-
-	// printf("\n");
-	// printf("buffers[0]->next_frpg: %ld\n", buffers[0]->frame.next_frpg);
-		
+    shutdown_db();
+    printf("file saved complete(%ld).\n", table_id);
     return 0;
 }
 #endif
+
+int search(int64_t table_id, int trx_id, int64_t key) {
+    char ret_val[120];
+    uint16_t old_size;
+    int result;
+
+    std::cout << "thread " << trx_id << " : key " <<  key << " 검색 시도!\n";
+    if(db_find(table_id, key, ret_val, &old_size, trx_id) != 0) {
+        std::cout << "thread "<< trx_id << " : ABORT 발생\n";
+        return 1;
+    }
+    std::cout << "thread " << trx_id << " 검색 성공!\n";
+    return 0;
+}
+
+int update(int64_t table_id, int trx_id, int64_t key) {
+    char* val = (char*)"__";
+    uint16_t old_size;
+    int result;
+
+    std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 시도!\n";
+    if(db_update(table_id, key, val, 10, &old_size, trx_id) != 0) {
+        std::cout << "thread "<< trx_id << " : ABORT 발생\n";
+        return 1;
+    }
+    std::cout << "thread " << trx_id << " 업데이트 성공!\n";
+    return 0;
+}
+
+
+void* thread1(void* arg)
+{
+    int randTemp, a, b;
+    int* tid = (int*)arg;
+    int txid = trx_begin();
+    std::cout << "Thread1 TXID = " << txid << std::endl;
+    
+    while(1) {
+        a = rand()%4;
+        if(a==0) {
+            if(search(*tid, txid, rand()%10)) return nullptr;
+        } else if(a==1) {
+            if(update(*tid, txid, rand()%10)) return nullptr;
+        } else if(a==2) {
+            std::cout << 2 << " sleep!" << '\n';
+            sleep(3);
+        } else {
+            trx_commit(txid);
+            return nullptr;
+        }
+    }
+
+    return nullptr;
+}
+
+void* thread2(void* arg)
+{
+    int randTemp, a, b;
+    int* tid = (int*)arg;
+    int txid = trx_begin();
+    std::cout << "Thread2 TXID = " << txid << std::endl;
+    
+    while(1) {
+        a = rand()%10;
+        if(a<4) {
+            if(search(*tid, txid, rand()%10)) return nullptr;
+        } else if(a<8) {
+            if(update(*tid, txid, rand()%10)) return nullptr;
+        } else if(a<9) {
+            std::cout << 2 << " sleep!" << '\n';
+            sleep(3);
+        } else {
+            trx_commit(txid);
+            return nullptr;
+        }
+    }
+
+    return nullptr;
+}
+
+int create_db(const char* pathname) {
+    std::random_device rd;
+	std::mt19937 gen(rd());
+	std::default_random_engine rng(rd());
+	char value[112];
+	uint16_t val_size;
+	std::vector<int> keys;
+	for (int i = 0; i < NUM_KEYS; i++) {
+		keys.push_back(i);
+	}
+    shuffle(keys.begin(), keys.end(), rng);
+	int64_t table_id = open_table((char*)pathname);
+    for (const auto& i : keys) {
+        sprintf(value, "%02d", i % 100);
+        if (db_insert(table_id, i, value, size(i)) != 0) return table_id;
+    }
+    return table_id;
+}
 
 void print_page(pagenum_t page_num, page_t page) {
 	if (page_num == 0) {
@@ -231,251 +199,89 @@ void print_pgnum(int64_t table_id, pagenum_t page_num) {
 	page_t* page;
 	int idx = buffer_read_page(table_id, page_num, &page);
 	print_page(page_num, *page);
-	pthread_mutex_unlock(&(buffers[idx]->page_latch));
+    pthread_mutex_unlock(&(buffers[idx]->page_latch));
 }
 
-void print_pgnum_from_disk(int64_t table_id, pagenum_t page_num) {
-    page_t page;
-    file_read_page(table_id, page_num, &page);
-    print_page(page_num, page);
-}
-
-void print_all(int64_t table_id) {
-    pagenum_t root_num, temp_num;
-    page_t* root, * page;
-
-    root_num = get_root_num(table_id);
-	printf("-----header information-----\n");
-	printf("root_num: %ld\n", root_num);
-	printf("\n");
-	if (!root_num) return;
-
-    int root_idx = buffer_read_page(table_id, root_num, &root);
-    print_page(root_num, *root);
-    if (root->is_leaf) {
-        pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
-        return;
-    }
-
-	int temp_idx;
-
-    temp_num = root->left_child;
-    temp_idx = buffer_read_page(table_id, temp_num, &page);
-    print_page(temp_num, *page); 
-    for (int i = 0; i < root->num_keys; i++) {
-        temp_num = root->entries[i].child;
-		pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
-        temp_idx = buffer_read_page(table_id, temp_num, &page);
-        print_page(temp_num, *page);
-    }
-	pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
-	pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
-}
-
-void print_all_from_disk(int64_t table_id) {
-    pagenum_t root_num, temp_num;
-    page_t root, page;
-
-    root_num = get_root_num(table_id);
-	printf("-----header information-----\n");
-	printf("root_num: %ld\n", root_num);
-	printf("\n");
-	if (!root_num) return;
-
-    file_read_page(table_id, root_num, &root);
-    print_page(root_num, root);
-    if (root.is_leaf) return;
-
-    temp_num = root.left_child;
-    file_read_page(table_id, temp_num, &page);
-    print_page(temp_num, page);
-    for (int i = 0; i < root.num_keys; i++) {
-        temp_num = root.entries[i].child;
-        file_read_page(table_id, temp_num, &page);
-        print_page(temp_num, page);
-    }
-}
-
-char* val(int key) {
-	static char value[3];
-	sprintf(value, "%02d", key % 100);
-	return value;
-}
-
-int size() {
-	return rand() % 63 + 50;
-}
-int size(int key) {
-	return key % 63 + 50;
-}
-
-int path_to_root(int64_t table_id, pagenum_t child_num) {
-	int length = 0;
-	pagenum_t c_num = child_num;
-	page_t* c;
-	int c_idx = buffer_read_page(table_id, c_num, &c);
-	while (c->parent != 0) {
-		c_num = c->parent;
-		pthread_mutex_unlock(&(buffers[c_idx]->page_latch));
-		c_idx = buffer_read_page(table_id, c_num, &c);
-		length++;
+#if 0
+int main() {
+    std::random_device rd;
+	std::mt19937 gen(rd());
+	std::default_random_engine rng(rd());
+	char value[112];
+	uint16_t val_size;
+	std::vector<int> keys;
+	for (int i = 0; i < NUM_KEYS; i++) {
+		keys.push_back(i);
 	}
-	pthread_mutex_unlock(&(buffers[c_idx]->page_latch));
-	return length;
-}
-
-void print_tree(int64_t table_id) {
-	pagenum_t root_pgnum, p_pgnum;
-	page_t *p, *parent;
-	int i = 0, rank = 0, new_rank = 0;
-	int p_idx, parent_idx;
+    shuffle(keys.begin(), keys.end(), rng);
 	
-	root_pgnum = get_root_num(table_id);
-	if (root_pgnum == 0) {
-		printf("Empty tree.\n");
-		return;
-	}
-
-	std::queue<pagenum_t> queue;
-	queue.push(root_pgnum);
-	while (!queue.empty()) {
-		p_pgnum = queue.front();
-		queue.pop();
-		p_idx = buffer_read_page(table_id, p_pgnum, &p);
-		parent_idx = buffer_read_page(table_id, p->parent, &parent);
-
-		if (p->parent != 0 && p_pgnum == parent->left_child) {
-            pthread_mutex_unlock(&(buffers[p_idx]->page_latch));
-            pthread_mutex_unlock(&(buffers[parent_idx]->page_latch));
-			new_rank = path_to_root(table_id, p_pgnum);
-            pthread_mutex_lock(&(buffers[p_idx]->page_latch));
-            pthread_mutex_lock(&(buffers[parent_idx]->page_latch));
-			if (new_rank != rank) {
-				rank = new_rank;
-				printf("\n");
-			}
-		}
-		if (p->is_leaf) printf("%ld ~ %ld ", p->slots[0].key, p->slots[p->num_keys - 1].key);
-		else for (i = 0; i < p->num_keys; i++) printf("%ld ", p->entries[i].key);
-		if (!p->is_leaf) {
-			queue.push(p->left_child);
-			for (i = 0; i < p->num_keys; i++)
-				queue.push(p->entries[i].child);
-		}
-		printf("| ");
-
-		pthread_mutex_unlock(&(buffers[p_idx]->page_latch));
-		pthread_mutex_unlock(&(buffers[parent_idx]->page_latch));
-	}
-	printf("\n");
-
-}
-
-int path_to_root_from_disk(int64_t table_id, pagenum_t child_num) {
-	int length = 0;
-	pagenum_t c_num = child_num;
-	page_t c;
-	file_read_page(table_id, c_num, &c);
-	while (c.parent != 0) {
-		c_num = c.parent;
-		file_read_page(table_id, c_num, &c);
-		length++;
-	}
-	return length;
-}
-
-void print_tree_from_disk(int64_t table_id) {
-	pagenum_t root_pgnum, p_pgnum;
-	page_t p, parent;
-	int i = 0, rank = 0, new_rank = 0;
-	
-	root_pgnum = get_root_num(table_id);
-	if (root_pgnum == 0) {
-		printf("Empty tree.\n");
-		return;
-	}
-
-	std::queue<pagenum_t> queue;
-	queue.push(root_pgnum);
-	while (!queue.empty()) {
-		p_pgnum = queue.front();
-		queue.pop();
-		file_read_page(table_id, p_pgnum, &p);
-		file_read_page(table_id, p.parent, &parent);
-		if (p.parent != 0 && p_pgnum == parent.left_child) {
-			new_rank = path_to_root(table_id, p_pgnum);
-			if (new_rank != rank) {
-				rank = new_rank;
-				printf("\n");
-			}
-		}
-		if (p.is_leaf) printf("%ld ~ %ld ", p.slots[0].key, p.slots[p.num_keys - 1].key);
-		else for (i = 0; i < p.num_keys; i++) printf("%ld ", p.entries[i].key);
-		if (!p.is_leaf) {
-			queue.push(p.left_child);
-			for (i = 0; i < p.num_keys; i++)
-				queue.push(p.entries[i].child);
-		}
-		printf("| ");
-	}
-	printf("\n");
-}
-
-void print_LRUs() {
-    int first_LRU_idx;
-    int buffer_idx;
-    buffer_t * buffer;
-    pagenum_t page_num;
-
-    first_LRU_idx = buffer_get_first_LRU_idx();
-    buffer = buffers[first_LRU_idx];
-
-    int i = 0;
-    while (buffer) {
-        page_num = buffer->page_num;
-        buffer_idx = buffer_get_buffer_idx(buffer->table_id, page_num);
-        printf("[%2d] buffer_idx : %2d, page_num : %4ld\n", i, buffer_idx, page_num);
-        i++;
-        buffer = buffer->next_LRU;
-    }
+    printf("[TEST START]\n\n");
+    printf("[NUM_KEYS : %7d] \n", NUM_KEYS);
+    printf("[NUM_BUFS : %7d] \n", NUM_BUFS);
     printf("\n");
-}
 
-void print_buffers() {
-    int i;
-    for (i = 0; i < buffer_size; i++) {
-        printf("\n\n----------buffer [%2d]----------\n", i);
-        print_page(buffers[i]->page_num, buffers[i]->frame);
-        printf("\n");
-        printf("pagenum: %ld\n", buffers[i]->page_num);
-        printf("page_latch: %d\n", (buffers[i]->page_latch).__data.__lock);
-        printf("\n");
+    init_db(NUM_BUFS);
+	int64_t table_id = open_table((char*)"table0");
+    for (int j = 0; j < 3; j++) {
+        shuffle(keys.begin(), keys.end(), rng);
+
+        printf("[REP%2d] ", j);
+
+        printf("[INSERT START]\n");
+        for (const auto& i : keys) {
+            // printf("insert %4d\n", i);
+            sprintf(value, "%02d", i % 100);
+            if (db_insert(table_id, i, value, size(i)) != 0) goto func_exit;
+        }
+        printf("\t[INSERT END]\n");
+
+        printf("\t[FIND START]\n");
+        for (const auto& i : keys) {
+            memset(value, 0x00, 112);
+            val_size = 0;
+            // printf("find %4d\n", i);
+            if(db_find(table_id, i, value, &val_size, 0) != 0) goto func_exit;
+            // else if (size(i) != val_size ||
+            // 		 val(i) != std::string(value, val_size)) {
+            // 	printf("value dismatched\n");
+            // 	goto func_exit;
+            // }
+        }
+        printf("\t[FIND END]\n");
+
+        // print_tree(table_id);
+        // printf("\n");
+
+        printf("\t[DELETE START]\n");
+        for (const auto& i : keys) {
+            // printf("delete %4d\n", i);
+            if (db_delete(table_id, i) != 0) goto func_exit;
+        }
+        printf("\t[DELETE END]\n");
+
+        printf("\t[FIND START AGAIN]\n");
+        for (const auto& i : keys) {
+            memset(value, 0x00, 112);
+            val_size = 0;
+            if (db_find(table_id, i, value, &val_size, 0) == 0) goto func_exit;
+        }
+        printf("\t[FIND END AGAIN]\n");
+
+        // print_tree(table_id);
+        // printf("\n");
     }
-}
 
-void print_freepg_list(int64_t table_id) {
-    page_t * page;
-    pagenum_t page_num;
-    pagenum_t temp;
-    buffer_read_page(table_id, 0, &page);
-    page_num = page->next_frpg;
-    buffer_write_page(table_id, 0, &page);
-    printf("   0");
-    while (page_num) {
-        printf("->%4ld", page_num);
-        buffer_read_page(table_id, page_num, &page);
-        temp = page_num;
-        page_num = page->next_frpg;
-        buffer_write_page(table_id, temp, &page);
-    }
-    printf("\n");
-}
+    printf("\n[TEST END]\n\n");    
 
-pagenum_t get_root_num(int64_t table_id) {
-    page_t * header;
-    int header_buffer_idx;
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    pagenum_t root_num = header->root_num;
-    pthread_mutex_unlock(&(buffers[header_buffer_idx]->page_latch));
-    return root_num;
+	func_exit:
+	printf("[SHUTDOWN START]\n");
+    // print_freepg_list(table_id);
+    // printf("\n");
+	// print_tree(table_id);
+    // printf("\n");
+	if (shutdown_db() != 0) {
+		return 0;
+	}
+	printf("[SHUTDOWN END]\n");
 }
+#endif

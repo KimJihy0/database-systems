@@ -27,6 +27,8 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     page_t * p;
     int i;
     
+    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
+
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
 
@@ -37,18 +39,17 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
 
     if (i == p->num_keys) return -1;
-    if (ret_val == NULL || val_size == NULL || trx_id == 0) return -2;
-    if (lock_acquire(table_id, p_pgnum, key, trx_id, SHARED) != 0) {
+    if (ret_val == NULL || val_size == NULL) return -2;
+    if (trx_id != 0 && lock_acquire(table_id, p_pgnum, key, i, trx_id, SHARED) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
 
     pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
-
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
-
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+
     return 0;
 }
 
@@ -57,6 +58,8 @@ int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_siz
     pagenum_t p_pgnum;
     page_t * p;
     int i;
+
+    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -68,25 +71,24 @@ int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_siz
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     
     if (i == p->num_keys) return -1;
-    if (lock_acquire(table_id, p_pgnum, key, trx_id, EXCLUSIVE) != 0) {
+    if (trx_id != 0 && lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
 
-    pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
-
-    log_t log;
-    log.table_id = table_id;
-    log.page_num = p_pgnum;
-    log.key = key;
-    memcpy(log.old_value, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
-    memcpy(log.new_value, values, new_val_size);
-    trx_table[trx_id].logs.push(log);
-
+    buffer_read_page(table_id, p_pgnum, &p);
+    if (trx_id != 0) {
+        pthread_mutex_lock(&trx_latch);
+        log_t log(table_id, p_pgnum, key);
+        memcpy(log.old_value, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
+        memcpy(log.new_value, values, new_val_size);
+        trx_table[trx_id]->logs.push(log);
+        pthread_mutex_unlock(&trx_latch);
+    }
     memcpy(p->values + p->slots[i].offset - HEADER_SIZE, values, new_val_size);
     *old_val_size = p->slots[i].size;
+    buffer_write_page(table_id, p_pgnum, &p);
 
-    pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     return 0;
 }
 
@@ -111,31 +113,6 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
     }
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     return p_pgnum;
-}
-
-int trx_abort(int trx_id) {
-    page_t * p;
-    int i;
-    log_t log;
-    while (!(trx_table[trx_id].logs.empty())) {
-        log = trx_table[trx_id].logs.top();
-        buffer_read_page(log.table_id, log.page_num, &p);
-        for (i = 0; i < p->num_keys; i++) if (p->slots[i].key == log.key) break;
-        memcpy(p->values + p->slots[i].offset - HEADER_SIZE, log.old_value, p->slots[i].size);
-        buffer_write_page(log.table_id, log.page_num, &p);
-        trx_table[trx_id].logs.pop();
-    }
-   
-    lock_t* lock_obj = trx_table[trx_id].head;
-    lock_t* del_obj;
-    while (lock_obj != NULL) {
-        if (lock_release(lock_obj) != 0) return 0;
-        del_obj = lock_obj;
-        lock_obj = lock_obj->trx_next_lock;
-        free(del_obj);
-    }
-    trx_table.erase(trx_id);
-    return trx_id;
 }
 
 // INSERTION
@@ -776,7 +753,7 @@ void merge_pages(int64_t table_id, pagenum_t p_pgnum,
     for (i = 0; i < sibling->num_keys; i++) {
         buffer_read_page(table_id, sibling->entries[i].child, &nephew);
         nephew->parent = (sibling_index != -1) ? sibling_pgnum : p_pgnum;
-        buffer_write_page(table_id, sibling->entries[i].child, &nephew, (i != 198) ? 0 : 1); // Segmentation fault
+        buffer_write_page(table_id, sibling->entries[i].child, &nephew);
     }
 
     parent_pgnum = p->parent;

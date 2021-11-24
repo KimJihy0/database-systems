@@ -2,7 +2,7 @@
 #define DB_BUFFER_H
 
 #include "file.h"
-#include "trx.h"
+#include <pthread.h>
 
 struct buffer_t {
     page_t frame;
@@ -28,6 +28,6 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num);
 pagenum_t buffer_alloc_page(int64_t table_id);
 void buffer_free_page(int64_t table_id, pagenum_t page_num);
 int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest);
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src, int flag = 0);
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src);
 
 #endif

@@ -16,10 +16,11 @@
 
 typedef uint64_t pagenum_t;
 
-struct __attribute__((packed)) slot_t {
+struct slot_t {
     int64_t key;
     uint16_t size;
     uint16_t offset;
+    uint32_t trx_id;
 };
 
 struct entry_t {

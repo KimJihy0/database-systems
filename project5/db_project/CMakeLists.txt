@@ -15,15 +15,17 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # Options for libraries
 option(USE_DB "Use the DB library" ON)
-option(USE_GOOGLE_TEST "Use GoogleTest for testing" ON)
+option(USE_GOOGLE_TEST "Use GoogleTest for testing" OFF)
 
 # DB project library
 if(USE_DB)
   add_subdirectory(db)
   list(APPEND EXTRA_LIBS db)
-  list(APPEND EXTRA_LIBS pthread)
 endif()
 
 # GoogleTest
@@ -33,7 +35,8 @@ endif()
 
 add_executable(${CMAKE_PROJECT_NAME} main.cc)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EXTRA_LIBS})
+target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EXTRA_LIBS}
+                      Threads::Threads)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
   "${PROJECT_BINARY_DIR}"

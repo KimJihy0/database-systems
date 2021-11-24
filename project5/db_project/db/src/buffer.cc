@@ -2,7 +2,7 @@
 
 buffer_t ** buffers;
 int buffer_size;
-pthread_mutex_t buffer_mng_latch;
+pthread_mutex_t buffer_latch;
 
 int buffer_init_buffer(int num_buf) {
     int i;
@@ -12,7 +12,7 @@ int buffer_init_buffer(int num_buf) {
     for (i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
-    pthread_mutex_init(&buffer_mng_latch, 0);
+    pthread_mutex_init(&buffer_latch, 0);
     return 0;
 }
 
@@ -23,7 +23,7 @@ int buffer_shutdown_buffer() {
             file_write_page(buffers[i]->table_id,
                             buffers[i]->page_num,
                             &(buffers[i]->frame));
-            free(buffers[i]);
+            delete buffers[i];
         }
     }
     free(buffers);
@@ -55,7 +55,7 @@ int buffer_get_buffer_idx(int64_t table_id, pagenum_t page_num) {
 }
 
 int buffer_request_page(int64_t table_id, pagenum_t page_num) {
-    pthread_mutex_lock(&buffer_mng_latch);
+    pthread_mutex_lock(&buffer_latch);
 
     buffer_t * victim;
     int i, buffer_idx, last_LRU_idx;
@@ -68,7 +68,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
                 buffers[buffer_idx]->next_LRU = NULL;
                 buffers[buffer_idx]->prev_LRU = NULL;
                 buffers[buffer_idx]->is_dirty = 0;
-                pthread_mutex_init(&(buffers[buffer_idx]->page_latch), 0);
+                buffers[buffer_idx]->page_latch = PTHREAD_MUTEX_INITIALIZER;
                 pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
                 break;
             }
@@ -109,7 +109,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         buffers[buffer_idx]->prev_LRU = NULL;
     }
 
-    pthread_mutex_unlock(&buffer_mng_latch);
+    pthread_mutex_unlock(&buffer_latch);
     return buffer_idx;
 }
 
@@ -155,7 +155,7 @@ int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest) {
     return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src, int flag) {
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src) {
     int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
     buffers[buffer_idx]->is_dirty = 1;
     pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
