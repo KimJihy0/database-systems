@@ -9,8 +9,8 @@
 #include <iostream>
 #include <time.h>
 
-#define NUM_KEYS    10000
-#define NUM_BUFS    400
+#define NUM_KEYS    100
+#define NUM_BUFS    5
 #define size(n)     ((n) % 63 + 46)                 
 
 // using namespace std;
@@ -24,7 +24,8 @@ void* thread2(void* arg);
 void* thread3(void* arg);
 int create_db(const char* pathname);
 void print_page(pagenum_t page_num, page_t page);
-void print_pgnum(int64_t table_id, pagenum_t page_num); 
+void print_pgnum(int64_t table_id, pagenum_t page_num);
+void print_all(int64_t table_id);
 
 #if 1
 int main() {
@@ -34,18 +35,19 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2559);
+    print_all(table_id);
 
     pthread_t tx1, tx2, tx3;
-    pthread_create(&tx1, 0, thread1, &table_id);
+    // pthread_create(&tx1, 0, thread1, &table_id);
     
-    for(int i = 0; i < 100000000; ++i);
+    // for(int i = 0; i < 100000000; ++i);
     pthread_create(&tx2, 0, thread2, &table_id);
 
-    pthread_join(tx1, NULL);
+    // pthread_join(tx1, NULL);
     pthread_join(tx2, NULL);
 
-    print_pgnum(table_id, 2559);
+    print_all(table_id);
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
@@ -61,23 +63,21 @@ int search(int64_t table_id, int trx_id, int64_t key) {
     std::cout << "thread " << trx_id << " : key " <<  key << " 검색 시도!\n";
     if(db_find(table_id, key, ret_val, &old_size, trx_id) != 0) {
         std::cout << "thread "<< trx_id << " : ABORT 발생\n";
-        return 1;
     }
-    std::cout << "thread " << trx_id << " 검색 성공!\n";
+    else std::cout << "thread " << trx_id << " : key " <<  key << " 검색 성공!\n\n";
     return 0;
 }
 
 int update(int64_t table_id, int trx_id, int64_t key) {
-    char* val = (char*)"__";
+    char* val = (char*)"**";
     uint16_t old_size;
     int result;
 
     std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 시도!\n";
     if(db_update(table_id, key, val, 10, &old_size, trx_id) != 0) {
         std::cout << "thread "<< trx_id << " : ABORT 발생\n";
-        return 1;
     }
-    std::cout << "thread " << trx_id << " 업데이트 성공!\n";
+    else std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 성공!\n\n";
     return 0;
 }
 
@@ -92,9 +92,9 @@ void* thread1(void* arg)
     while(1) {
         a = rand()%4;
         if(a==0) {
-            if(search(*tid, txid, rand()%10)) return nullptr;
+            search(*tid, txid, rand()%100);
         } else if(a==1) {
-            if(update(*tid, txid, rand()%10)) return nullptr;
+            update(*tid, txid, rand()%100);
         } else if(a==2) {
             std::cout << 2 << " sleep!" << '\n';
             sleep(3);
@@ -117,9 +117,9 @@ void* thread2(void* arg)
     while(1) {
         a = rand()%10;
         if(a<4) {
-            if(search(*tid, txid, rand()%10)) return nullptr;
+            search(*tid, txid, rand()%100);
         } else if(a<8) {
-            if(update(*tid, txid, rand()%10)) return nullptr;
+            update(*tid, txid, rand()%100);
         } else if(a<9) {
             std::cout << 2 << " sleep!" << '\n';
             sleep(3);
@@ -200,6 +200,39 @@ void print_pgnum(int64_t table_id, pagenum_t page_num) {
 	int idx = buffer_read_page(table_id, page_num, &page);
 	print_page(page_num, *page);
     pthread_mutex_unlock(&(buffers[idx]->page_latch));
+}
+
+void print_all(int64_t table_id) {
+    pagenum_t root_num, temp_num;
+    page_t* root, * page, * header;
+
+    int header_idx = buffer_read_page(table_id, 0, &header);
+    root_num = header->root_num;
+    pthread_mutex_unlock(&(buffers[header_idx]->page_latch));
+
+	printf("-----header information-----\n");
+	printf("root_num: %ld\n", root_num);
+	printf("\n");
+	if (!root_num) return;
+
+    int root_idx = buffer_read_page(table_id, root_num, &root);
+    print_page(root_num, *root);
+    if (root->is_leaf) {
+        pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
+        return;
+    }
+
+    temp_num = root->left_child;
+    int temp_idx = buffer_read_page(table_id, temp_num, &page);
+    print_page(temp_num, *page); 
+    for (int i = 0; i < root->num_keys; i++) {
+        temp_num = root->entries[i].child;
+        pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
+        temp_idx = buffer_read_page(table_id, temp_num, &page);
+        print_page(temp_num, *page);
+    }
+    pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
+    pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
 }
 
 #if 0

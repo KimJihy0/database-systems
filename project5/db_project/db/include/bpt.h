@@ -18,7 +18,7 @@ int64_t open_table(char * pathname);
 // SEARCH & UPDATE
 
 int db_find(int64_t table_id, int64_t key, char * ret_val, uint16_t * val_size, int trx_id);
-int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_size,
+int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size,
               uint16_t * old_val_size, int trx_id);
 pagenum_t find_leaf(int64_t table_id, int64_t key);
 

@@ -53,7 +53,7 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     return 0;
 }
 
-int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_size,
+int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size,
               uint16_t * old_val_size, int trx_id) {
     pagenum_t p_pgnum;
     page_t * p;
@@ -81,11 +81,11 @@ int db_update(int64_t table_id, int64_t key, char * values, uint16_t new_val_siz
         pthread_mutex_lock(&trx_latch);
         log_t log(table_id, p_pgnum, key);
         memcpy(log.old_value, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
-        memcpy(log.new_value, values, new_val_size);
+        memcpy(log.new_value, value, new_val_size);
         trx_table[trx_id]->logs.push(log);
         pthread_mutex_unlock(&trx_latch);
     }
-    memcpy(p->values + p->slots[i].offset - HEADER_SIZE, values, new_val_size);
+    memcpy(p->values + p->slots[i].offset - HEADER_SIZE, value, new_val_size);
     *old_val_size = p->slots[i].size;
     buffer_write_page(table_id, p_pgnum, &p);
 
