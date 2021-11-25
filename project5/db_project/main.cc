@@ -9,45 +9,91 @@
 #include <iostream>
 #include <time.h>
 
-#define NUM_KEYS    100
-#define NUM_BUFS    10
-#define size(n)     ((n) % 63 + 46)                 
+#define NUM_KEYS    (50)
+#define NUM_BUFS    (10)
+#define SIZE(n)     ((n) % 63 + 46)
+#define NEW_VAL     ((char*)"??")
+
+#define UPDATE_THREADS_NUMBER   (4)
+#define SEARCH_THREADS_NUMBER   (4)
+
+#define UPDATE_COUNT            (10)
+#define SEARCH_COUNT            (10)
 
 // using namespace std;
 
 static int count = 0;
 
-int search(int64_t table_id, int trx_id, int64_t key);
-int update(int64_t table_id, int trx_id, int64_t key);
-void* thread1(void* arg);
-void* thread2(void* arg);
-void* thread3(void* arg);
+std::string gen_rand_val();
 int create_db(const char* pathname);
-
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
 
+void* update_thread_func(void* arg)
+{
+    int64_t key;
+    uint16_t old_size;
+    int* table_id = (int*)arg;
+    
+    int trx_id = trx_begin();
+    key = rand() % (NUM_KEYS - 9);
+    
+    for (int j = 0; j < 10; j++)
+        db_update(*table_id, key + j, NEW_VAL, SIZE(key), &old_size, trx_id);
+    if (trx_commit(trx_id) == trx_id) printf("Update thread is done(abort).\n");
+    else printf("Update thread is done(commit).\n");
+
+    return nullptr;
+}
+
+void* search_thread_func(void* arg)
+{
+    int64_t key;
+    char ret_val[108];
+    uint16_t old_size;
+    int* table_id = (int*)arg;
+    
+    int trx_id = trx_begin();
+    for (int i = 0; i < SEARCH_COUNT; i++) {
+        key = rand() % NUM_KEYS;
+        db_find(*table_id, key, ret_val, &old_size, trx_id);
+        // printf("%d%s\n", key, ret_val);
+    }
+    if (trx_commit(trx_id) == trx_id) printf("Search thread is done(commit).\n");
+    else printf("Search thread is done(abort).\n");
+
+    return nullptr;
+}
+
 #if 1
 int main() {
+    pthread_t update_threads[UPDATE_THREADS_NUMBER];
+    pthread_t search_threads[SEARCH_THREADS_NUMBER];
+
     srand(time(__null));
+
+    for (int i = 0; i < 10; i++) {
+        printf("%s\n", gen_rand_val());
+    }
+
+    return 0;
 
     init_db(NUM_BUFS);
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
     print_all(table_id);
-
-    pthread_t threads[8];
-    // pthread_create(&tx1, 0, thread1, &table_id);
     
-    // for(int i = 0; i < 100000000; ++i);
-    for(int i = 0; i < 8; i++)
-        pthread_create(&threads[i], 0, thread2, &table_id);
+    for(int i = 0; i < UPDATE_THREADS_NUMBER; i++)
+        pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
+    for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
+        pthread_create(&search_threads[i], 0, search_thread_func, &table_id);
 
-    for(int i = 0; i < 8; i++)
-        pthread_join(threads[i], NULL);
-    // pthread_join(tx2, NULL);
+    for(int i = 0; i < UPDATE_THREADS_NUMBER; i++)
+        pthread_join(update_threads[i], NULL);
+    for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
+        pthread_join(search_threads[i], NULL);
 
 
     print_all(table_id);
@@ -58,69 +104,28 @@ int main() {
 }
 #endif
 
-int search(int64_t table_id, int trx_id, int64_t key) {
-    char ret_val[120];
-    uint16_t old_size;
-    int result;
+std::string gen_rand_val() {
+    static const std::string CHARACTERS {
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"};
+    char ret_value[2];
+	uint16_t ret_size;
 
-    printf("trx%d : key %2ld search...", trx_id, key);
-    result = db_find(table_id, key, ret_val, &old_size, trx_id);
-    if(result == 0) std::cout << "success!\n";
-    else if (result == -1) std::cout << "failed!\n";
-    else if (result > 0) std::cout << "abort!\n";
-    else std::cout << "unknown error!\n";
-    return 0;
-}
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<int> char_dis(1, CHARACTERS.size());
+	std::default_random_engine rng(rd());
 
-int update(int64_t table_id, int trx_id, int64_t key) {
-    char* val = (char*)"**";
-    uint16_t old_size;
-    int result;
-
-    printf("trx%d : key %2ld update...", trx_id, key);
-    result = db_update(table_id, key, val, 10, &old_size, trx_id);
-    if(result == 0) std::cout << "success!\n";
-    else if (result == -1) std::cout << "failed!\n";
-    else if (result > 0) std::cout << "abort!\n";
-    else std::cout << "unknown error!\n";
-    return 0;
-}
-
-
-void* thread1(void* arg)
-{
-    int a;
-    int* table_id = (int*)arg;
-    
-    int trx_id = trx_begin();
-    while (1) {
-        a = rand()%4;
-        if(a==0) search(*table_id, trx_id, rand() % NUM_KEYS);
-        else if(a==1) update(*table_id, trx_id, rand() % NUM_KEYS);
-        else if(a==2) sleep(1);
-        else break;
-    }
-    trx_commit(trx_id);
-
-    return nullptr;
-}
-
-void* thread2(void* arg)
-{
-    int a;
-    int* table_id = (int*)arg;
-
-    int trx_id = trx_begin();
-    while(1) {
-        a = rand()%10;
-        if(a<8) search(*table_id, trx_id, rand() % NUM_KEYS);
-        else if(a<8) update(*table_id, trx_id, rand() % NUM_KEYS);
-        else if(a<9) sleep(1);
-        else break;
-    }
-    trx_commit(trx_id);
-
-    return nullptr;
+	auto helper_function = [] (auto& gen, auto& cd, auto& size) -> std::string {
+		std::string ret_str;
+		int index;
+		ret_str.reserve(size);
+		for (int i = 0; i < size; ++i) {
+			index = cd(gen) - 1;
+			ret_str += CHARACTERS[index];
+		}
+		return ret_str;
+	};
+    return helper_function(gen, char_dis, &(2));
 }
 
 int create_db(const char* pathname) {
@@ -137,7 +142,7 @@ int create_db(const char* pathname) {
 	int64_t table_id = open_table((char*)pathname);
     for (const auto& i : keys) {
         sprintf(value, "%02d", i % 100);
-        if (db_insert(table_id, i, value, size(i)) != 0) return table_id;
+        if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
     }
     return table_id;
 }
@@ -255,7 +260,7 @@ int main() {
         for (const auto& i : keys) {
             // printf("insert %4d\n", i);
             sprintf(value, "%02d", i % 100);
-            if (db_insert(table_id, i, value, size(i)) != 0) goto func_exit;
+            if (db_insert(table_id, i, value, SIZE(i)) != 0) goto func_exit;
         }
         printf("\t[INSERT END]\n");
 
@@ -265,7 +270,7 @@ int main() {
             val_size = 0;
             // printf("find %4d\n", i);
             if(db_find(table_id, i, value, &val_size, 0) != 0) goto func_exit;
-            // else if (size(i) != val_size ||
+            // else if (SIZE(i) != val_size ||
             // 		 val(i) != std::string(value, val_size)) {
             // 	printf("value dismatched\n");
             // 	goto func_exit;

@@ -13,21 +13,21 @@ int trx_id;
 
 int trx_begin() {
     #if verbose
-    printf("----------------------------------------------------------------------------------------trx_begin");
+    printf("----------------------------------------------------------------------------------------trx_begin()\n");
     #endif
     pthread_mutex_lock(&trx_latch);
     int local_trx_id = ++trx_id;
                             #if verbose
-                            printf("(%d)\ntrx_begin(%d) start\n", trx_id, trx_id);
+                            printf("trx_begin(%d) start\n", trx_id);
                             #endif
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = ACTIVE;
-    pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             printf("trx_begin(%d) end\n", trx_id);
                             #endif
+    pthread_mutex_unlock(&trx_latch);
     return local_trx_id;
 }
 
@@ -35,8 +35,7 @@ int trx_commit(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     int trx_state = trx_table[trx_id]->trx_state;
     pthread_mutex_unlock(&trx_latch);
-
-    if (trx_state == ABORTED) return -1;
+    if (trx_state == ABORTED) return 0;
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
