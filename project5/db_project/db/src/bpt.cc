@@ -27,12 +27,11 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     page_t * p;
     int i;
     
-    if (trx_id != 0) {
-        pthread_mutex_lock(&trx_latch);
-        int trx_state = trx_table[trx_id]->trx_state;
-        pthread_mutex_unlock(&trx_latch);
-        if (trx_state == ABORTED) return trx_id;
-    }
+    pthread_mutex_lock(&trx_latch);
+    int trx_state = 0;
+    if (trx_id) trx_state = trx_table[trx_id]->trx_state;
+    pthread_mutex_unlock(&trx_latch);
+    if (trx_state == ABORTED) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -44,13 +43,14 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
 
     if (i == p->num_keys) return -1;
-    if (ret_val == NULL || val_size == NULL) return -2;
-    if (trx_id != 0 && lock_acquire(table_id, p_pgnum, key, i, trx_id, SHARED) != 0) {
+    if (ret_val == NULL || val_size == NULL || trx_id == 0) return -2;
+    if (lock_acquire(table_id, p_pgnum, key, i, trx_id, SHARED) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
 
-    pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
+    // pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
@@ -64,12 +64,11 @@ int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size
     page_t * p;
     int i;
 
-    if (trx_id != 0) {
-        pthread_mutex_lock(&trx_latch);
-        int trx_state = trx_table[trx_id]->trx_state;
-        pthread_mutex_unlock(&trx_latch);
-        if (trx_state == ABORTED) return trx_id;
-    }
+    pthread_mutex_lock(&trx_latch);
+    int trx_state = 0;
+    if (trx_id) trx_state = trx_table[trx_id]->trx_state;
+    pthread_mutex_unlock(&trx_latch);
+    if (trx_state == ABORTED) return trx_id;
     
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -81,24 +80,22 @@ int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     
     if (i == p->num_keys) return -1;
-    if (trx_id != 0 && lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
+    if (value == NULL || old_val_size == NULL || trx_id == 0) return -2;
+    if (lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
 
     buffer_read_page(table_id, p_pgnum, &p);
-    if (trx_id != 0) {
-        uint16_t old_val_offset = p->slots[i].offset - HEADER_SIZE;
-        uint16_t old_val_size = p->slots[i].size;
-        log_t log(table_id, p_pgnum, old_val_offset, old_val_size);
-        memcpy(log.old_value, p->values + old_val_offset, old_val_size);
-        memcpy(log.new_value, value, new_val_size);
-        pthread_mutex_lock(&trx_latch);
-        trx_table[trx_id]->logs.push(log);
-        pthread_mutex_unlock(&trx_latch);
-    }
-    memcpy(p->values + p->slots[i].offset - HEADER_SIZE, value, new_val_size);
+    uint16_t offset = p->slots[i].offset - HEADER_SIZE;
     *old_val_size = p->slots[i].size;
+    log_t log(table_id, p_pgnum, offset, *old_val_size);
+    memcpy(log.old_value, p->values + offset, *old_val_size);
+    memcpy(p->values + offset, value, new_val_size);
+    memcpy(log.new_value, p->values + offset, new_val_size);
+    pthread_mutex_lock(&trx_latch);
+    trx_table[trx_id]->logs.push(log);
+    pthread_mutex_unlock(&trx_latch);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;

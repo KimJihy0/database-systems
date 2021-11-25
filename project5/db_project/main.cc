@@ -10,7 +10,7 @@
 #include <time.h>
 
 #define NUM_KEYS    100
-#define NUM_BUFS    3
+#define NUM_BUFS    10
 #define size(n)     ((n) % 63 + 46)                 
 
 // using namespace std;
@@ -23,11 +23,12 @@ void* thread1(void* arg);
 void* thread2(void* arg);
 void* thread3(void* arg);
 int create_db(const char* pathname);
+
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
 
-#if 0
+#if 1
 int main() {
     srand(time(__null));
 
@@ -35,17 +36,23 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    // print_pgnum(table_id, 2559);
     print_all(table_id);
 
-    pthread_t tx1, tx2, tx3;
+    uint16_t old_val_size;
+    int trx_id = trx_begin();
+    for (int i = 0; i < 100; i++)
+        db_update(table_id, i, (char*)"!!", 2, &old_val_size, trx_id);
+    trx_abort(trx_id);
+
+    // pthread_t tx1, tx2, tx3;
     // pthread_create(&tx1, 0, thread1, &table_id);
     
     // for(int i = 0; i < 100000000; ++i);
-    pthread_create(&tx2, 0, thread2, &table_id);
+    // pthread_create(&tx2, 0, thread2, &table_id);
 
     // pthread_join(tx1, NULL);
-    pthread_join(tx2, NULL);
+    // pthread_join(tx2, NULL);
+
 
     print_all(table_id);
 
@@ -60,11 +67,13 @@ int search(int64_t table_id, int trx_id, int64_t key) {
     uint16_t old_size;
     int result;
 
-    // std::cout << "thread " << trx_id << " : key " <<  key << " 검색 시도!\n";
+    printf("trx%d : key %2ld search...", trx_id, key);
     if(db_find(table_id, key, ret_val, &old_size, trx_id) != 0) {
-        std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
+        // std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
+        std::cout << "abort!\n";
     }
     // else std::cout << "thread " << trx_id << " : key " <<  key << " 검색 성공!\n\n";
+    else std::cout << "success!\n";
     return 0;
 }
 
@@ -73,11 +82,13 @@ int update(int64_t table_id, int trx_id, int64_t key) {
     uint16_t old_size;
     int result;
 
-    // std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 시도!\n";
+    printf("trx%d : key %2ld update...", trx_id, key);
     if(db_update(table_id, key, val, 10, &old_size, trx_id) != 0) {
-        std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
+        // std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
+        std::cout << "abort!\n";
     }
     // else std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 성공!\n\n";
+    else std::cout << "success!\n";
     return 0;
 }
 
@@ -112,8 +123,7 @@ void* thread2(void* arg)
         if(a<4) search(*table_id, trx_id, rand() % NUM_KEYS);
         else if(a<8) update(*table_id, trx_id, rand() % NUM_KEYS);
         else if(a<9) sleep(1);
-        // else break;
-        else continue;
+        else break;
     }
     trx_commit(trx_id);
 

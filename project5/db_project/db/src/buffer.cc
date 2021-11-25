@@ -27,6 +27,7 @@ int buffer_shutdown_buffer() {
         }
     }
     free(buffers);
+    pthread_mutex_destroy(&buffer_latch);
     return 0;
 }
 

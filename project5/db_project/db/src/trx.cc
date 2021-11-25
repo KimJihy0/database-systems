@@ -160,7 +160,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
             //                 #if verbose
             //                 printf("but conflict\n");
             //                 #endif
-            //     // return -1;
+            //     return -1;
             // }
             return 0;
         }

@@ -33,7 +33,7 @@ struct lock_t {
 
 struct log_t {
     log_t(int64_t table_id, pagenum_t page_num, uint16_t offset, uint16_t size) :
-        table_id(table_id), page_num(page_num), size(offset), offset(size) {}
+        table_id(table_id), page_num(page_num), offset(offset), size(size) {}
     int64_t table_id;
     pagenum_t page_num;
     uint16_t offset;

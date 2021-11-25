@@ -15,7 +15,6 @@ struct buffer_t {
 };
 
 extern buffer_t ** buffers;
-extern int buffer_size;
 
 int buffer_init_buffer(int num_buf);
 int buffer_shutdown_buffer();

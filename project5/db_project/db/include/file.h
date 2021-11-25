@@ -20,7 +20,7 @@ struct slot_t {
     int64_t key;
     uint16_t size;
     uint16_t offset;
-    uint32_t trx_id;
+    int32_t trx_id;
 };
 
 struct entry_t {
@@ -60,8 +60,6 @@ struct table_t {
     char pathname[256];
     int fd;
 };
-
-extern table_t tables[];
 
 int64_t file_open_table_file(const char * pathname);
 pagenum_t file_alloc_page(int64_t table_id);
