@@ -5,9 +5,19 @@
 #include <vector>
 #include <assert.h>
 #include <unistd.h>
-#include <time.h>
+#include <ctime>
 #include <iostream>
-#include <time.h>
+
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <fstream>
+#include <ctime>
+#include <algorithm>
+#include <vector>
+#include <random>
+#include <unistd.h>
+#include <utility>
 
 #define NUM_KEYS    (50)
 #define NUM_BUFS    (10)
@@ -24,7 +34,7 @@
 
 static int count = 0;
 
-std::string gen_rand_val();
+std::string gen_rand_val(int size);
 int create_db(const char* pathname);
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
@@ -36,13 +46,12 @@ void* update_thread_func(void* arg)
     uint16_t old_size;
     int* table_id = (int*)arg;
     
+    key = rand() % NUM_KEYS;
     int trx_id = trx_begin();
-    key = rand() % (NUM_KEYS - 9);
-    
-    for (int j = 0; j < 10; j++)
-        db_update(*table_id, key + j, NEW_VAL, SIZE(key), &old_size, trx_id);
-    if (trx_commit(trx_id) == trx_id) printf("Update thread is done(abort).\n");
-    else printf("Update thread is done(commit).\n");
+
+    db_update(*table_id, key, (char*)gen_rand_val(3).c_str(), SIZE(key), &old_size, trx_id);
+    if (trx_commit(trx_id) == trx_id) printf("Update thread is done(commit).\n");
+    else printf("Update thread is done(abort).\n");
 
     return nullptr;
 }
@@ -73,12 +82,6 @@ int main() {
 
     srand(time(__null));
 
-    for (int i = 0; i < 10; i++) {
-        printf("%s\n", gen_rand_val());
-    }
-
-    return 0;
-
     init_db(NUM_BUFS);
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
@@ -104,7 +107,7 @@ int main() {
 }
 #endif
 
-std::string gen_rand_val() {
+std::string gen_rand_val(int size) {
     static const std::string CHARACTERS {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"};
     char ret_value[2];
@@ -115,17 +118,16 @@ std::string gen_rand_val() {
 	std::uniform_int_distribution<int> char_dis(1, CHARACTERS.size());
 	std::default_random_engine rng(rd());
 
-	auto helper_function = [] (auto& gen, auto& cd, auto& size) -> std::string {
+	auto helper_function = [] (auto& gen, auto& cd, auto size) -> std::string {
 		std::string ret_str;
 		int index;
-		ret_str.reserve(size);
 		for (int i = 0; i < size; ++i) {
 			index = cd(gen) - 1;
 			ret_str += CHARACTERS[index];
 		}
 		return ret_str;
 	};
-    return helper_function(gen, char_dis, &(2));
+    return helper_function(gen, char_dis, size);
 }
 
 int create_db(const char* pathname) {
@@ -170,7 +172,10 @@ void print_page(pagenum_t page_num, page_t page) {
 		printf("sibling: %ld\n", page.sibling);
 
 		for (int i = 0; i < page.num_keys; i++) {
-			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.values + page.slots[i].offset - HEADER_SIZE);
+            char value[page.slots[i].size + 1];
+            memcpy(value, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
+            value[page.slots[i].size] = 0;
+			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, value);
 		}
 	}
 	else {
