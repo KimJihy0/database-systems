@@ -224,6 +224,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         cur_obj = lock_entry->head;
         while (cur_obj != lock_obj) {
             if (cur_obj->record_id == key &&
+                    cur_obj->owner_trx_id != trx_id &&
                     (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
                 pthread_mutex_lock(&trx_latch);
                 trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
