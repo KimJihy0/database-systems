@@ -21,8 +21,8 @@ int64_t open_table(char * pathname) {
 
 // SEARCH & UPDATE
 
-int db_find(int64_t table_id, int64_t key, char * ret_val,
-            uint16_t * val_size, int trx_id) {
+int db_find(int64_t table_id, int64_t key,
+            char * ret_val, uint16_t * val_size, int trx_id) {
     pagenum_t p_pgnum;
     page_t * p;
     int i;
@@ -49,8 +49,8 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
         return trx_id;
     }
 
-    // pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
-    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    // p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
@@ -58,8 +58,8 @@ int db_find(int64_t table_id, int64_t key, char * ret_val,
     return 0;
 }
 
-int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size,
-              uint16_t * old_val_size, int trx_id) {
+int db_update(int64_t table_id, int64_t key,
+              char * value, uint16_t new_val_size, uint16_t * old_val_size, int trx_id) {
     pagenum_t p_pgnum;
     page_t * p;
     int i;
@@ -80,7 +80,7 @@ int db_update(int64_t table_id, int64_t key, char * value, uint16_t new_val_size
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     
     if (i == p->num_keys) return -1;
-    if (value == NULL || old_val_size == NULL || trx_id == 0) return -2;
+    if (old_val_size == NULL || trx_id == 0) return -2;
     if (lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
         trx_abort(trx_id);
         return trx_id;

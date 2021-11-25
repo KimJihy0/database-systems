@@ -38,19 +38,15 @@ int main() {
 
     print_all(table_id);
 
-    uint16_t old_val_size;
-    int trx_id = trx_begin();
-    for (int i = 0; i < 100; i++)
-        db_update(table_id, i, (char*)"!!", 2, &old_val_size, trx_id);
-    trx_abort(trx_id);
-
-    // pthread_t tx1, tx2, tx3;
+    pthread_t threads[8];
     // pthread_create(&tx1, 0, thread1, &table_id);
     
     // for(int i = 0; i < 100000000; ++i);
-    // pthread_create(&tx2, 0, thread2, &table_id);
+    for(int i = 0; i < 8; i++)
+        pthread_create(&threads[i], 0, thread2, &table_id);
 
-    // pthread_join(tx1, NULL);
+    for(int i = 0; i < 8; i++)
+        pthread_join(threads[i], NULL);
     // pthread_join(tx2, NULL);
 
 
@@ -68,12 +64,11 @@ int search(int64_t table_id, int trx_id, int64_t key) {
     int result;
 
     printf("trx%d : key %2ld search...", trx_id, key);
-    if(db_find(table_id, key, ret_val, &old_size, trx_id) != 0) {
-        // std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
-        std::cout << "abort!\n";
-    }
-    // else std::cout << "thread " << trx_id << " : key " <<  key << " 검색 성공!\n\n";
-    else std::cout << "success!\n";
+    result = db_find(table_id, key, ret_val, &old_size, trx_id);
+    if(result == 0) std::cout << "success!\n";
+    else if (result == -1) std::cout << "failed!\n";
+    else if (result > 0) std::cout << "abort!\n";
+    else std::cout << "unknown error!\n";
     return 0;
 }
 
@@ -83,12 +78,11 @@ int update(int64_t table_id, int trx_id, int64_t key) {
     int result;
 
     printf("trx%d : key %2ld update...", trx_id, key);
-    if(db_update(table_id, key, val, 10, &old_size, trx_id) != 0) {
-        // std::cout << "thread " << trx_id << " : key " <<  key << " ABORT!\n\n";
-        std::cout << "abort!\n";
-    }
-    // else std::cout << "thread " << trx_id << " : key " <<  key << " 업데이트 성공!\n\n";
-    else std::cout << "success!\n";
+    result = db_update(table_id, key, val, 10, &old_size, trx_id);
+    if(result == 0) std::cout << "success!\n";
+    else if (result == -1) std::cout << "failed!\n";
+    else if (result > 0) std::cout << "abort!\n";
+    else std::cout << "unknown error!\n";
     return 0;
 }
 
@@ -117,10 +111,9 @@ void* thread2(void* arg)
     int* table_id = (int*)arg;
 
     int trx_id = trx_begin();
-    int T = 200;
-    while(T--) {
+    while(1) {
         a = rand()%10;
-        if(a<4) search(*table_id, trx_id, rand() % NUM_KEYS);
+        if(a<8) search(*table_id, trx_id, rand() % NUM_KEYS);
         else if(a<8) update(*table_id, trx_id, rand() % NUM_KEYS);
         else if(a<9) sleep(1);
         else break;

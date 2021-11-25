@@ -71,7 +71,6 @@ int trx_commit(int trx_id) {
 }
 
 int trx_abort(int trx_id) {
-    // if (trx_table[trx_id]->trx_state == ABORTED) return 0;
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_abort(%d)\n", trx_id);
     #endif
