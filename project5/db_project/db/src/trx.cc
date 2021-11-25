@@ -35,7 +35,7 @@ int trx_commit(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     int trx_state = trx_table[trx_id]->trx_state;
     pthread_mutex_unlock(&trx_latch);
-    if (trx_state == ABORTED) return trx_id;
+    if (trx_state == ABORTED) return 0;
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
