@@ -210,9 +210,9 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
             if (cur_obj->record_id == key &&
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
-                pthread_mutex_lock(&trx_latch);
+                // pthread_mutex_lock(&trx_latch);
                 trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
-                pthread_mutex_unlock(&trx_latch);
+                // pthread_mutex_unlock(&trx_latch);
                                 #if verbose
                                 if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, key);
                                 else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, table_id, key);
@@ -227,9 +227,9 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
-                pthread_mutex_lock(&trx_latch);
+                // pthread_mutex_lock(&trx_latch);
                 trx_table[trx_id]->waits_for_trx_id = 0;
-                pthread_mutex_unlock(&trx_latch);
+                // pthread_mutex_unlock(&trx_latch);
 
                 break;
             }
