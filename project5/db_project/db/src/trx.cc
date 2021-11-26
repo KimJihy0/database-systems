@@ -139,7 +139,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
     lock_obj = lock_entry->head;
     while (lock_obj != NULL) {
         if (lock_obj->record_id == key && lock_obj->owner_trx_id == trx_id) {
-            if (lock_obj->lock_mode < lock_mode) break;
+            if (lock_obj->lock_mode < lock_mode) continue;
             pthread_mutex_unlock(&lock_latch);
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
@@ -310,7 +310,7 @@ void* print_locks(void* args) {
 /* ---To do---
  * project4 구조 원상복귀
  * broadcast -> signal
- * lock_acquire() 1,2번째 while문 확인.
+ * lock_acquire() 1,2번째 while문 확인. (lock_bitmap? wait_bitmap?)
  * 
  * max_trx_id
  * LRU -> head, tail로 구현 가능한지 확인.
@@ -318,17 +318,16 @@ void* print_locks(void* args) {
  * layer : file->buffer->trx->bpt
  * while() { pthread_cond_wait } ?
  * cmake gdb
- * log latch
- * lock_acquire()에서 deadlock detection해도 되는지. NULL return 가능한지.
  * pathname?????
  * detection 주기, 위치
  * insert, delete 시 slot_index 바뀌는데 무시하는건지.
  * lock_entry 구조체 메모리 정렬
- * piazza @241 (아마 안할듯)
  * memory leak in trx_table
- * ACTIVE, COMMITTED, ABORTED : 0,1,2 or 1,2,3
  * 
  * ---Done---
+ * log latch
+ * lock_acquire()에서 deadlock detection해도 되는지. NULL return 가능한지.
+ * ACTIVE, COMMITTED, ABORTED : 0,1,2 or 1,2,3
  * log->key(X) log->offset(O)
  * trx 관련 trx_latch
  * trx_abort()가 index manager에 있어서 찝찝한 상태.
