@@ -26,7 +26,7 @@ struct lock_t {
     struct lock_entry_t* sentinel;
     pthread_cond_t cond_var;
     int lock_mode;
-    int record_id;
+    int64_t record_id;
     struct lock_t* trx_next_lock;
     int owner_trx_id;
     // uint64_t lock_bitmap;

@@ -95,11 +95,11 @@ int db_update(int64_t table_id, int64_t key,
     memcpy(log.old_value, p->values + offset, size);
     memcpy(p->values + offset, value, new_val_size);
     memcpy(log.new_value, p->values + offset, size);
-    buffer_write_page(table_id, p_pgnum, &p);
     *old_val_size = size;
     pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->logs.push(log);
     pthread_mutex_unlock(&trx_latch);
+    buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;
 }
