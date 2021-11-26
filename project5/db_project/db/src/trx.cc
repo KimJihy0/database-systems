@@ -170,7 +170,6 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
 
 int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode) {
     lock_entry_t* lock_entry = &(lock_table[{table_id, page_num}]);
-    trx_entry_t* trx_entry = trx_table[trx_id];
     lock_t* lock_obj = lock_entry->head;
 
                             #if verbose
@@ -198,8 +197,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     }
 
     pthread_mutex_lock(&trx_latch);
-    lock_obj->trx_next_lock = trx_entry->head;
-    trx_entry->head = lock_obj;
+    lock_obj->trx_next_lock = trx_table[trx_id]->head;
+    trx_table[trx_id]->head = lock_obj;
     pthread_mutex_unlock(&trx_latch);
 
     // SET_BIT(lock_obj->wait_bitmap, idx);
@@ -212,24 +211,24 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
                 pthread_mutex_lock(&trx_latch);
-                trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
+                trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
                 pthread_mutex_unlock(&trx_latch);
                                 #if verbose
-                                if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, key);
-                                else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, table_id, key);
+                                if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, key);
+                                else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, table_id, key);
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
                 if (detect_deadlock(trx_id) == trx_id) return -1;
                 pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
                                 #if verbose
-                                if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, page_num, key);
-                                else printf("trx %d wakes up trx %d to read (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, table_id, key);
+                                if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %ld)\n", trx_table[trx_id]->waits_for_trx_id, trx_id, page_num, key);
+                                else printf("trx %d wakes up trx %d to read (%ld, %ld)\n", trx_table[trx_id]->waits_for_trx_id, trx_id, table_id, key);
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
                 pthread_mutex_lock(&trx_latch);
-                trx_entry->waits_for_trx_id = 0;
+                trx_table[trx_id]->waits_for_trx_id = 0;
                 pthread_mutex_unlock(&trx_latch);
 
                 break;
