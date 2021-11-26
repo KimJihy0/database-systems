@@ -3,26 +3,18 @@
 #include <random>
 #include <algorithm>
 #include <vector>
-#include <assert.h>
-#include <unistd.h>
-#include <ctime>
-#include <iostream>
+#include <time.h>
 
-
-#define NUM_KEYS    (50)
-#define NUM_BUFS    (10)
+#define NUM_KEYS    (10000)
+#define NUM_BUFS    (100)
 #define SIZE(n)     ((n) % 63 + 46)
-#define NEW_VAL     ((char*)"??")
+#define NEW_VAL     ((char*)"!!")
 
-#define UPDATE_THREADS_NUMBER   (5)
-#define SEARCH_THREADS_NUMBER   (0)
+#define UPDATE_THREADS_NUMBER   (8)
+#define SEARCH_THREADS_NUMBER   (8)
 
-#define UPDATE_COUNT            (5)
-#define SEARCH_COUNT            (5)
-
-// using namespace std;
-
-static int count = 0;
+#define UPDATE_COUNT            (50)
+#define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname);
@@ -30,39 +22,36 @@ void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
 
-void* update_thread_func(void* arg)
-{
-    int64_t key;
+void* update_thread_func(void* arg) {
+    int64_t keys[UPDATE_COUNT];
     uint16_t old_size;
     int* table_id = (int*)arg;
-    
-    srand(time(__null));
+    std::string value = gen_rand_val(2);
+
     int trx_id = trx_begin();
-    for (int i = 0; i < UPDATE_COUNT; i++) {
-        key = rand() & NUM_KEYS / 10 + 24;
-        db_update(*table_id, key, NEW_VAL, SIZE(key), &old_size, trx_id);
-    }
-    if (trx_commit(trx_id) == trx_id) printf("Update thread is done(commit).\n");
-    else printf("Update thread is done(abort).\n");
+    for (int i = 0; i < NUM_KEYS; i++)
+        db_update(*table_id, i, (char*)value.c_str(), 2, &old_size, trx_id);
+    if (trx_commit(trx_id) == trx_id)
+        printf("Update thread is done(commit).\n");
+    else
+        printf("Update thread is done(abort).\n");
 
     return nullptr;
 }
 
-void* search_thread_func(void* arg)
-{
-    int64_t key;
+void* search_thread_func(void* arg) {
+    int64_t keys[SEARCH_COUNT];
     char ret_val[108];
     uint16_t old_size;
     int* table_id = (int*)arg;
-    
-    srand(time(__null));
+
     int trx_id = trx_begin();
-    for (int i = 0; i < SEARCH_COUNT; i++) {
-        key = rand() % NUM_KEYS / 10 + 24;
-        db_find(*table_id, key, ret_val, &old_size, trx_id);
-    }
-    if (trx_commit(trx_id) == trx_id) printf("Search thread is done(commit).\n");
-    else printf("Search thread is done(abort).\n");
+    for (int i = 0; i < NUM_KEYS; i++)
+        db_find(*table_id, i, ret_val, &old_size, trx_id);
+    if (trx_commit(trx_id) == trx_id)
+        printf("Search thread is done(commit).\n");
+    else
+        printf("Search thread is done(abort).\n");
 
     return nullptr;
 }
@@ -84,12 +73,11 @@ int main() {
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
     for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_create(&search_threads[i], 0, search_thread_func, &table_id);
-
+        
     for(int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_join(update_threads[i], NULL);
     for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_join(search_threads[i], NULL);
-
 
     print_all(table_id);
 

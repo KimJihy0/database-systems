@@ -264,6 +264,7 @@ int lock_release(lock_t* lock_obj) {
     return 0;
 }
 
+#if verbose
 void print_waits_for_graph() {
     char c;
     for (int i = 1; i <= 8; i++) {
@@ -302,7 +303,7 @@ void* print_locks(void* args) {
     printf("\n");
     return NULL;
 }
-
+#endif
 
 
 /* ---To do---

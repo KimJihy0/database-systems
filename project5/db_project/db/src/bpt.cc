@@ -37,12 +37,13 @@ int db_find(int64_t table_id, int64_t key,
     if (p_pgnum == 0) return -1;
 
     int p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
-    for (i = 0; i < p->num_keys; i++) {
+    int num_keys = p->num_keys;
+    for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
     }
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
 
-    if (i == p->num_keys) return -1;
+    if (i == num_keys) return -1;
     if (ret_val == NULL || val_size == NULL || trx_id == 0) return -2;
     if (lock_acquire(table_id, p_pgnum, key, i, trx_id, SHARED) != 0) {
         trx_abort(trx_id);
@@ -74,12 +75,13 @@ int db_update(int64_t table_id, int64_t key,
     if (p_pgnum == 0) return -1;
 
     int p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
-    for (i = 0; i < p->num_keys; i++) {
+    int num_keys = p->num_keys;
+    for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
     }
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     
-    if (i == p->num_keys) return -1;
+    if (i == num_keys) return -1;
     if (old_val_size == NULL || trx_id == 0) return -2;
     if (lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
         trx_abort(trx_id);
@@ -88,14 +90,15 @@ int db_update(int64_t table_id, int64_t key,
 
     buffer_read_page(table_id, p_pgnum, &p);
     uint16_t offset = p->slots[i].offset - HEADER_SIZE;
-    *old_val_size = p->slots[i].size;
-    // log_t log(table_id, p_pgnum, offset, *old_val_size);
-    // memcpy(log.old_value, p->values + offset, *old_val_size);
+    uint16_t size = p->slots[i].size;
+    log_t log(table_id, p_pgnum, offset, size);
+    memcpy(log.old_value, p->values + offset, size);
     memcpy(p->values + offset, value, new_val_size);
-    // memcpy(log.new_value, p->values + offset, new_val_size);
-    // pthread_mutex_lock(&trx_latch);
-    // trx_table[trx_id]->logs.push(log);
-    // pthread_mutex_unlock(&trx_latch);
+    memcpy(log.new_value, p->values + offset, size);
+    *old_val_size = size;
+    pthread_mutex_lock(&trx_latch);
+    trx_table[trx_id]->logs.push(log);
+    pthread_mutex_unlock(&trx_latch);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;
