@@ -5,15 +5,15 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (10000)
+#define NUM_KEYS    (50)
 #define NUM_BUFS    (100)
 #define SIZE(n)     ((n) % 63 + 46)
-#define NEW_VAL     ((char*)"!!")
+#define NEW_VAL     ((char*)"##")
 
-#define UPDATE_THREADS_NUMBER   (8)
-#define SEARCH_THREADS_NUMBER   (8)
+#define UPDATE_THREADS_NUMBER   (5)
+#define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (50)
+#define UPDATE_COUNT            (10)
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
@@ -28,9 +28,13 @@ void* update_thread_func(void* arg) {
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
 
+    for (int i = 0; i < UPDATE_COUNT; i++)
+        keys[i] = rand() % 4 + 27;
+    std::sort(keys, keys + UPDATE_COUNT);
+
     int trx_id = trx_begin();
-    for (int i = 0; i < NUM_KEYS; i++)
-        db_update(*table_id, i, (char*)value.c_str(), 2, &old_size, trx_id);
+    for (int i = 0; i < UPDATE_COUNT; i++)
+        db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).\n");
     else
@@ -69,14 +73,14 @@ int main() {
 
     print_all(table_id);
     
-    for(int i = 0; i < UPDATE_THREADS_NUMBER; i++)
+    for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
-    for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
+    for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_create(&search_threads[i], 0, search_thread_func, &table_id);
         
-    for(int i = 0; i < UPDATE_THREADS_NUMBER; i++)
+    for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_join(update_threads[i], NULL);
-    for(int i = 0; i < SEARCH_THREADS_NUMBER; i++)
+    for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_join(search_threads[i], NULL);
 
     print_all(table_id);

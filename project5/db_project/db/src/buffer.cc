@@ -4,7 +4,7 @@ buffer_t ** buffers;
 int buffer_size;
 pthread_mutex_t buffer_latch;
 
-int buffer_init_buffer(int num_buf) {
+int init_buffer(int num_buf) {
     int i;
     buffer_size = num_buf;
     buffers = (buffer_t **)malloc(buffer_size * sizeof(buffer_t *));
@@ -16,7 +16,7 @@ int buffer_init_buffer(int num_buf) {
     return 0;
 }
 
-int buffer_shutdown_buffer() {
+int shutdown_buffer() {
     int i;
     for (i = 0; i < buffer_size; i++) {
         if (buffers[i] != NULL) {

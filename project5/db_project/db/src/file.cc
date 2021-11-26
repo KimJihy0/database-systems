@@ -29,8 +29,7 @@ int64_t file_open_table_file(const char * pathname) {
 		fsync(fd);
 
 		page_t p;
-		int i;
-		for (i = 1; i < INITIAL_PAGENUM; i++) {
+		for (int i = 1; i < INITIAL_PAGENUM; i++) {
 			p.next_frpg = i - 1;
 			if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE) {
 				perror("Failure to open table file(write error)");
@@ -167,8 +166,7 @@ void file_write_page(int64_t table_id, pagenum_t page_num, const page_t * src) {
 }
 
 void file_close_table_file() {
-	int i;
-	for (i = 0; i < NUM_BUCKETS; i++) {
+	for (int i = 0; i < NUM_BUCKETS; i++) {
         if (strlen(tables[i].pathname) != 0)
 			close(tables[i].fd);
 	}

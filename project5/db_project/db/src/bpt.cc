@@ -3,14 +3,14 @@
 // DBMS
 
 int init_db(int num_buf) {
-    if (buffer_init_buffer(num_buf) != 0) return -1;
+    if (init_buffer(num_buf) != 0) return -1;
     if (init_lock_table() != 0) return -1;
     return 0;
 }
 
 int shutdown_db() {
-    if (buffer_shutdown_buffer() != 0) return -1;
     if (shutdown_lock_table() != 0) return -1;
+    if (shutdown_buffer() != 0) return -1;
     file_close_table_file();
     return 0;
 }

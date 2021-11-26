@@ -11,6 +11,18 @@ std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash> lock_
 std::unordered_map<int, trx_entry_t*> trx_table;
 int trx_id;
 
+int init_lock_table() {
+    if (pthread_mutex_init(&lock_latch, 0) != 0) return -1;
+    if (pthread_mutex_init(&trx_latch, 0) != 0) return -1;
+    return 0;
+}
+
+int shutdown_lock_table() {
+    if (pthread_mutex_destroy(&lock_latch) != 0) return -1;
+    if (pthread_mutex_destroy(&trx_latch) != 0) return -1;
+    return 0;
+}
+
 int trx_begin() {
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_begin()\n");
@@ -50,7 +62,7 @@ int trx_commit(int trx_id) {
 
     lock_t* del_obj;
     while (lock_obj != NULL) {
-        lock_release(lock_obj);
+        if (lock_release(lock_obj) != 0) return 0;
         del_obj = lock_obj;
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
@@ -93,7 +105,7 @@ int trx_abort(int trx_id) {
    
     lock_t* del_obj;
     while (lock_obj != NULL) {
-        lock_release(lock_obj);
+        if (lock_release(lock_obj) != 0) return 0;
         del_obj = lock_obj;
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
@@ -112,29 +124,6 @@ int trx_abort(int trx_id) {
     return trx_id;
 }
 
-int detect_deadlock(int trx_id) {
-    std::unordered_map<int, int> visit;
-    pthread_mutex_lock(&trx_latch);
-    do {
-        visit[trx_id] = 1;
-        trx_id = trx_table[trx_id]->waits_for_trx_id;
-    } while (trx_id != 0 && !visit[trx_id]);
-    pthread_mutex_unlock(&trx_latch);
-    return trx_id;
-}
-
-int init_lock_table() {
-    if (pthread_mutex_init(&lock_latch, 0) != 0) return -1;
-    if (pthread_mutex_init(&trx_latch, 0) != 0) return -1;
-    return 0;
-}
-
-int shutdown_lock_table() {
-    if (pthread_mutex_destroy(&lock_latch) != 0) return -1;
-    if (pthread_mutex_destroy(&trx_latch) != 0) return -1;
-    return 0;
-}
-
 int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode) {
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d)\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
@@ -150,6 +139,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
     lock_obj = lock_entry->head;
     while (lock_obj != NULL) {
         if (lock_obj->record_id == key && lock_obj->owner_trx_id == trx_id) {
+            if (lock_obj->lock_mode < lock_mode) break;
             pthread_mutex_unlock(&lock_latch);
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
@@ -248,6 +238,17 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     }
     // SET_BIT(lock_obj->lock_bitmap, idx);
     return 0;
+}
+
+int detect_deadlock(int trx_id) {
+    std::unordered_map<int, int> visit;
+    pthread_mutex_lock(&trx_latch);
+    do {
+        visit[trx_id] = 1;
+        trx_id = trx_table[trx_id]->waits_for_trx_id;
+    } while (trx_id != 0 && !visit[trx_id]);
+    pthread_mutex_unlock(&trx_latch);
+    return trx_id;
 }
 
 int lock_release(lock_t* lock_obj) {

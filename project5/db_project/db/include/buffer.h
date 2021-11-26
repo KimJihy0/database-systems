@@ -16,8 +16,8 @@ struct buffer_t {
 
 extern buffer_t ** buffers;
 
-int buffer_init_buffer(int num_buf);
-int buffer_shutdown_buffer();
+int init_buffer(int num_buf);
+int shutdown_buffer();
 
 int buffer_get_first_LRU_idx();
 int buffer_get_last_LRU_idx();
