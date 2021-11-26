@@ -138,8 +138,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
 
     lock_obj = lock_entry->head;
     while (lock_obj != NULL) {
-        if (lock_obj->record_id == key && lock_obj->owner_trx_id == trx_id) {
-            if (lock_obj->lock_mode < lock_mode) continue;
+        if (lock_obj->record_id == key &&
+            lock_obj->owner_trx_id == trx_id &&
+            lock_obj->lock_mode >= lock_mode) {
             pthread_mutex_unlock(&lock_latch);
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
@@ -208,8 +209,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         cur_obj = lock_entry->head;
         while (cur_obj != lock_obj) {
             if (cur_obj->record_id == key &&
-                    cur_obj->owner_trx_id != trx_id &&
-                    (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
+                cur_obj->owner_trx_id != trx_id &&
+                (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
                 pthread_mutex_lock(&trx_latch);
                 trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
                 pthread_mutex_unlock(&trx_latch);
@@ -335,7 +336,6 @@ void* print_locks(void* args) {
  * undo할 때 lock?
  * logging 필요? 필요하다면 꼭 파일에 해야 하는지
  * waits_for_trx_id : 1개인지.
- * mattr 전역변수로
  * NUM_BUFS 1일 때 에러나야 함.
  * if (p_buffer_idx != -1) 일단 지워놨음.
  * relock시 latch.__data.__lock value 확인.
