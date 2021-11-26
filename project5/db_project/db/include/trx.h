@@ -40,8 +40,8 @@ struct log_t {
     pagenum_t page_num;
     uint16_t offset;
     uint16_t size;
-    char old_value[108];
-    char new_value[108];
+    char old_value[110];
+    char new_value[110];
 };
 
 struct lock_entry_t {
