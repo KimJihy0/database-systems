@@ -89,13 +89,13 @@ int db_update(int64_t table_id, int64_t key,
     buffer_read_page(table_id, p_pgnum, &p);
     uint16_t offset = p->slots[i].offset - HEADER_SIZE;
     *old_val_size = p->slots[i].size;
-    log_t log(table_id, p_pgnum, offset, *old_val_size);
-    memcpy(log.old_value, p->values + offset, *old_val_size);
+    // log_t log(table_id, p_pgnum, offset, *old_val_size);
+    // memcpy(log.old_value, p->values + offset, *old_val_size);
     memcpy(p->values + offset, value, new_val_size);
-    memcpy(log.new_value, p->values + offset, new_val_size);
-    pthread_mutex_lock(&trx_latch);
-    trx_table[trx_id]->logs.push(log);
-    pthread_mutex_unlock(&trx_latch);
+    // memcpy(log.new_value, p->values + offset, new_val_size);
+    // pthread_mutex_lock(&trx_latch);
+    // trx_table[trx_id]->logs.push(log);
+    // pthread_mutex_unlock(&trx_latch);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;

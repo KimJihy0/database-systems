@@ -154,12 +154,6 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
                             #endif
-            // if (lock_obj->lock_mode == SHARED && lock_mode == EXCLUSIVE) {
-            //                 #if verbose
-            //                 printf("but conflict\n");
-            //                 #endif
-            //     return -1;
-            // }
             return 0;
         }
         lock_obj = lock_obj->next_lock;
@@ -232,16 +226,16 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                                 #if verbose
                                 if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, key);
                                 else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, table_id, key);
-                                // print_waits_for_graph();
-                                // print_locks();
+                                print_waits_for_graph();
+                                print_locks(NULL);
                                 #endif
                 if (detect_deadlock(trx_id) == trx_id) return -1;
                 pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
                                 #if verbose
                                 if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, page_num, key);
                                 else printf("trx %d wakes up trx %d to read (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, table_id, key);
-                                // print_waits_for_graph();
-                                // print_locks();
+                                print_waits_for_graph();
+                                print_locks(NULL);
                                 #endif
                 pthread_mutex_lock(&trx_latch);
                 trx_entry->waits_for_trx_id = 0;
@@ -269,6 +263,47 @@ int lock_release(lock_t* lock_obj) {
     pthread_cond_broadcast(&(lock_obj->cond_var));
     return 0;
 }
+
+void print_waits_for_graph() {
+    char c;
+    for (int i = 1; i <= 8; i++) {
+        printf("\t%d->%d ", i, trx_table[i] ? trx_table[i]->waits_for_trx_id : -1);
+    }
+    printf("\n");
+    for (int i = 1; i <= 8; i++) {
+        c = 'N';
+        if (trx_table[i])
+            switch (trx_table[i]->trx_state) {
+                case ACTIVE : c = 'A'; break;
+                case COMMITTED : c = 'C'; break;
+                case ABORTED : c = 'X'; break;
+            }
+        printf("\t%d: %c ", i, c);
+    }
+    printf("\n");
+}
+
+void* print_locks(void* args) {
+    for (int i = 2559; i > 2557; i--) {
+        printf("\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tpage%d : ", i);
+        lock_t* lock_obj = lock_table[{568, i}].head;
+        for (; lock_obj; lock_obj = lock_obj->next_lock) {
+            printf("[T%d %2d", lock_obj->owner_trx_id, lock_obj->record_id);
+            printf("%c", lock_obj->lock_mode ? 'X' : 'S');
+            printf("]->");
+        }
+        printf("[NULL]\n");
+    }
+    // for (int i = 0; i < TABLE_NUMBER; i++) {
+    //     for (int j = 0; j < RECORD_NUMBER; j++) {
+    //         printf("\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t(%d,%d) : T%d / ", i, j, implicit_trx_id[i][j]);
+    //     }
+    // }
+    printf("\n");
+    return NULL;
+}
+
+
 
 /* ---To do---
  * project4 구조 원상복귀

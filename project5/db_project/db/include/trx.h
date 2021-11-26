@@ -70,4 +70,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key,
                 int idx, int trx_id, int lock_mode);
 int lock_release(lock_t* lock_obj);
 
+void print_waits_for_graph();
+void* print_locks(void* args);
+
 #endif

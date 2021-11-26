@@ -14,11 +14,11 @@
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"??")
 
-#define UPDATE_THREADS_NUMBER   (0)
-#define SEARCH_THREADS_NUMBER   (8)
+#define UPDATE_THREADS_NUMBER   (5)
+#define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (10)
-#define SEARCH_COUNT            (100000)
+#define UPDATE_COUNT            (5)
+#define SEARCH_COUNT            (5)
 
 // using namespace std;
 
@@ -36,9 +36,10 @@ void* update_thread_func(void* arg)
     uint16_t old_size;
     int* table_id = (int*)arg;
     
+    srand(time(__null));
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++) {
-        key = rand() & NUM_KEYS;
+        key = rand() & NUM_KEYS / 10 + 24;
         db_update(*table_id, key, NEW_VAL, SIZE(key), &old_size, trx_id);
     }
     if (trx_commit(trx_id) == trx_id) printf("Update thread is done(commit).\n");
@@ -54,9 +55,10 @@ void* search_thread_func(void* arg)
     uint16_t old_size;
     int* table_id = (int*)arg;
     
+    srand(time(__null));
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++) {
-        key = rand() % NUM_KEYS;
+        key = rand() % NUM_KEYS / 10 + 24;
         db_find(*table_id, key, ret_val, &old_size, trx_id);
     }
     if (trx_commit(trx_id) == trx_id) printf("Search thread is done(commit).\n");
