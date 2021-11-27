@@ -95,13 +95,9 @@ std::string gen_rand_val(int size) {
     static const std::string CHARACTERS {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"};
     char ret_value[2];
-	uint16_t ret_size;
-
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<int> char_dis(1, CHARACTERS.size());
-	std::default_random_engine rng(rd());
-
 	auto helper_function = [] (auto& gen, auto& cd, auto size) -> std::string {
 		std::string ret_str;
 		int index;
