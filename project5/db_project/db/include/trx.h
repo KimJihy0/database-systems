@@ -55,7 +55,6 @@ struct trx_entry_t {
 };
 
 extern std::unordered_map<int, trx_entry_t*> trx_table;
-extern pthread_mutex_t trx_latch;
 
 int init_lock_table();
 int shutdown_lock_table();

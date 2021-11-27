@@ -27,11 +27,7 @@ int db_find(int64_t table_id, int64_t key,
     page_t * p;
     int i;
     
-    // pthread_mutex_lock(&trx_latch);
-    int trx_state = 0;
-    if (trx_id) trx_state = trx_table[trx_id]->trx_state;
-    // pthread_mutex_unlock(&trx_latch);
-    if (trx_state == ABORTED) return trx_id;
+    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -65,11 +61,7 @@ int db_update(int64_t table_id, int64_t key,
     page_t * p;
     int i;
 
-    // pthread_mutex_lock(&trx_latch);
-    int trx_state = 0;
-    if (trx_id) trx_state = trx_table[trx_id]->trx_state;
-    // pthread_mutex_unlock(&trx_latch);
-    if (trx_state == ABORTED) return trx_id;
+    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
     
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -96,9 +88,7 @@ int db_update(int64_t table_id, int64_t key,
     memcpy(p->values + offset, value, new_val_size);
     memcpy(log.new_value, p->values + offset, size);
     *old_val_size = size;
-    // pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->logs.push(log);
-    // pthread_mutex_unlock(&trx_latch);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;
