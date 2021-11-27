@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <stack>
 
-#define verbose     0
+#define verbose     1
 
 #define SHARED      0
 #define EXCLUSIVE   1

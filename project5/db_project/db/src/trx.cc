@@ -263,7 +263,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     do {
         cur_obj = lock_entry->head;
         while (cur_obj != NULL) {
-            if (GET_BIT(cur_obj->wait_bitmap, idx) != 0 &&
+            if (GET_BIT(cur_obj->lock_bitmap, idx) != 0 &&
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
                 trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
