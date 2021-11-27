@@ -11,10 +11,10 @@
 #define NEW_VAL     ((char*)"$$")
 
 #define UPDATE_THREADS_NUMBER   (5)
-#define SEARCH_THREADS_NUMBER   (0)
+#define SEARCH_THREADS_NUMBER   (5)
 
-#define UPDATE_COUNT            (10)
-#define SEARCH_COUNT            (10)
+#define UPDATE_COUNT            (5)
+#define SEARCH_COUNT            (5)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname);
@@ -28,12 +28,12 @@ void* update_thread_func(void* arg) {
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
     for (int i = 0; i < UPDATE_COUNT; i++)
+        // keys[i] = i;
         keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
-    for (int i = 0; i < UPDATE_COUNT; i++) {
+    for (int i = 0; i < UPDATE_COUNT; i++)
         db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
-    }
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
@@ -49,6 +49,7 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
+        // keys[i] = i;
         keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
@@ -72,6 +73,7 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
+    // print_all(table_id);
     // print_pgnum(table_id, 2559);
     // print_pgnum(table_id, 2558);
     // return 0;
@@ -132,7 +134,7 @@ int create_db(const char* pathname) {
     // }
     for (int i = 0; i < NUM_KEYS; i++) {
         sprintf(value, "%02d", i % 100);
-        db_insert(table_id, i, value, SIZE(i));
+        if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
     }
     return table_id;
 }

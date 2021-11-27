@@ -206,14 +206,17 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
 
 int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode) {
     lock_entry_t* lock_entry = &(lock_table[{table_id, page_num}]);
-    lock_t* lock_obj = lock_entry->head;
+    lock_t* lock_obj = NULL;
 
-    while (lock_obj != NULL) {
-        if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
-        lock_obj = lock_obj->next_lock;
+    if (lock_mode == SHARED) {
+        lock_obj = lock_entry->head;
+        while (lock_obj != NULL) {
+            if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
+            lock_obj = lock_obj->next_lock;
+        }
     }
 
-    if (lock_obj == NULL || lock_mode == EXCLUSIVE) {
+    if (lock_obj == NULL) {
                             #if verbose
                             printf("lock_acquire(%ld, %d, %c, %d) alloc~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
                             #endif
