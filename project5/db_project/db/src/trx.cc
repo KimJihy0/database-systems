@@ -56,9 +56,9 @@ int trx_commit(int trx_id) {
                             #if verbose
                             printf("trx_commit(%d) start\n", trx_id);
                             #endif
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     lock_t* lock_obj = trx_table[trx_id]->head;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
 
     lock_t* del_obj;
     while (lock_obj != NULL) {
@@ -68,11 +68,11 @@ int trx_commit(int trx_id) {
         delete del_obj;
     }
 
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = COMMITTED;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
                             printf("trx_commit(%d) end\n", trx_id);
@@ -90,18 +90,18 @@ int trx_abort(int trx_id) {
                             printf("trx_abort(%d) start\n", trx_id);
                             #endif
 
-    // pthread_mutex_lock(&trx_latch);
-    page_t * p;
-    log_t* log;
-    while (!(trx_table[trx_id]->logs.empty())) {
-        log = &(trx_table[trx_id]->logs.top());
-        buffer_read_page(log->table_id, log->page_num, &p);
-        memcpy(p->values + log->offset, log->old_value, log->size);
-        buffer_write_page(log->table_id, log->page_num, &p);
-        trx_table[trx_id]->logs.pop();
-    }
+    pthread_mutex_lock(&trx_latch);
+    // page_t * p;
+    // log_t* log;
+    // while (!(trx_table[trx_id]->logs.empty())) {
+    //     log = &(trx_table[trx_id]->logs.top());
+    //     buffer_read_page(log->table_id, log->page_num, &p);
+    //     memcpy(p->values + log->offset, log->old_value, log->size);
+    //     buffer_write_page(log->table_id, log->page_num, &p);
+    //     trx_table[trx_id]->logs.pop();
+    // }
     lock_t* lock_obj = trx_table[trx_id]->head;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
    
     lock_t* del_obj;
     while (lock_obj != NULL) {
@@ -111,11 +111,11 @@ int trx_abort(int trx_id) {
         delete del_obj;
     }
 
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = ABORTED;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
                             printf("trx_abort(%d) end\n", trx_id);
@@ -202,10 +202,10 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_entry->tail = lock_obj;
     }
 
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     lock_obj->trx_next_lock = trx_table[trx_id]->head;
     trx_table[trx_id]->head = lock_obj;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
     // }
     // SET_BIT(lock_obj->wait_bitmap, idx);
 
