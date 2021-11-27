@@ -27,11 +27,12 @@ void* update_thread_func(void* arg) {
     uint16_t old_size;
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
+    for (int i = 0; i < UPDATE_COUNT; i++)
+        keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++) {
-        int64_t key = (rand() % 2) * 28 + (rand() % 2);
-        db_update(*table_id, key, (char*)value.c_str(), 2, &old_size, trx_id);
+        db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     }
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
@@ -48,7 +49,7 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = i;
+        keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -71,8 +72,9 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    print_pgnum(table_id, 2559);
-    print_pgnum(table_id, 2558);
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2558);
+    // return 0;
     
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
@@ -124,9 +126,13 @@ int create_db(const char* pathname) {
 	}
     shuffle(keys.begin(), keys.end(), rng);
 	int64_t table_id = open_table((char*)pathname);
-    for (const auto& i : keys) {
+    // for (const auto& i : keys) {
+    //     sprintf(value, "%02d", i % 100);
+    //     if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
+    // }
+    for (int i = 0; i < NUM_KEYS; i++) {
         sprintf(value, "%02d", i % 100);
-        if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
+        db_insert(table_id, i, value, SIZE(i));
     }
     return table_id;
 }
@@ -153,11 +159,12 @@ void print_page(pagenum_t page_num, page_t page) {
 		// printf("free_space: %ld\n", page.free_space);
 		// printf("sibling: %ld\n", page.sibling);
 
+		// for (int i = 0; i < page.num_keys; i++) {
 		for (int i = 0; i < 2; i++) {
             char value[page.slots[i].size + 1];
             memcpy(value, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
             value[page.slots[i].size] = 0;
-			printf("key: %3ld, size: %3d, offset: %4d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, value);
+			printf("key: %3ld, size: %3d, offset: %4d, trx_id: %d, value: %s\n", page.slots[i].key, page.slots[i].size, page.slots[i].offset, page.slots[i].trx_id, value);
 		}
 	}
 	else {
