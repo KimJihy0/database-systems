@@ -5,15 +5,15 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (10000)
-#define NUM_BUFS    (400)
+#define NUM_KEYS    (50)
+#define NUM_BUFS    (50)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (8)
+#define UPDATE_THREADS_NUMBER   (5)
 #define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (10000)
+#define UPDATE_COUNT            (10)
 #define SEARCH_COUNT            (10)
 
 std::string gen_rand_val(int size);
@@ -28,12 +28,11 @@ void* update_thread_func(void* arg) {
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
 
-    for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = i;
-
     int trx_id = trx_begin();
-    for (int i = 0; i < UPDATE_COUNT; i++)
-        db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
+    for (int i = 0; i < UPDATE_COUNT; i++) {
+        int64_t key = (rand() % 2) * 28 + (rand() % 2);
+        db_update(*table_id, key, (char*)value.c_str(), 2, &old_size, trx_id);
+    }
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
@@ -72,11 +71,8 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2282);
-    // return 0;
-
-    // print_all(table_id);
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
     
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
@@ -89,6 +85,8 @@ int main() {
         pthread_join(search_threads[i], NULL);
 
     // print_all(table_id);
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
@@ -149,13 +147,13 @@ void print_page(pagenum_t page_num, page_t page) {
         else
             printf("-----root information-----\n");
         printf("number: %ld\n", page_num);
-		printf("parent: %ld\n", page.parent);
-		printf("is_leaf: %d\n", page.is_leaf);
-		printf("num_keys: %d\n", page.num_keys);
-		printf("free_space: %ld\n", page.free_space);
-		printf("sibling: %ld\n", page.sibling);
+		// printf("parent: %ld\n", page.parent);
+		// printf("is_leaf: %d\n", page.is_leaf);
+		// printf("num_keys: %d\n", page.num_keys);
+		// printf("free_space: %ld\n", page.free_space);
+		// printf("sibling: %ld\n", page.sibling);
 
-		for (int i = 0; i < page.num_keys; i++) {
+		for (int i = 0; i < 2; i++) {
             char value[page.slots[i].size + 1];
             memcpy(value, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
             value[page.slots[i].size] = 0;

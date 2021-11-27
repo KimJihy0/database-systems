@@ -30,14 +30,14 @@ int trx_begin() {
     pthread_mutex_lock(&trx_latch);
     int local_trx_id = ++trx_id;
                             #if verbose
-                            printf("trx_begin(%d) start\n", trx_id);
+                            printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
                             #endif
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     trx_table[trx_id]->trx_state = ACTIVE;
                             #if verbose
-                            printf("trx_begin(%d) end\n", trx_id);
+                            printf("\t\t\t\t\ttrx_begin(%d) end\n", trx_id);
                             #endif
     pthread_mutex_unlock(&trx_latch);
     return local_trx_id;
@@ -54,7 +54,7 @@ int trx_commit(int trx_id) {
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
-                            printf("trx_commit(%d) start\n", trx_id);
+                            printf("\t\t\t\t\ttrx_commit(%d) start\n", trx_id);
                             #endif
     pthread_mutex_lock(&trx_latch);
     lock_t* lock_obj = trx_table[trx_id]->head;
@@ -75,7 +75,7 @@ int trx_commit(int trx_id) {
     pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
-                            printf("trx_commit(%d) end\n", trx_id);
+                            printf("\t\t\t\t\ttrx_commit(%d) end\n", trx_id);
                             #endif
     pthread_mutex_unlock(&lock_latch);
     return trx_id;
@@ -87,7 +87,7 @@ int trx_abort(int trx_id) {
     #endif
     pthread_mutex_lock(&lock_latch);
                             #if verbose
-                            printf("trx_abort(%d) start\n", trx_id);
+                            printf("\t\t\t\t\ttrx_abort(%d) start\n", trx_id);
                             #endif
 
     pthread_mutex_lock(&trx_latch);
@@ -118,7 +118,7 @@ int trx_abort(int trx_id) {
     pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
-                            printf("trx_abort(%d) end\n", trx_id);
+                            printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
                             #endif
     pthread_mutex_unlock(&lock_latch);
     return trx_id;
@@ -126,7 +126,7 @@ int trx_abort(int trx_id) {
 
 int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode) {
                             #if verbose
-                            printf("lock_acquire(%ld, %ld, %c, %d)\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            printf("\t\t\t\t\tlock_acquire(%ld, %ld, %c, %d)\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
                             #endif
     pthread_mutex_lock(&lock_latch);
                             #if verbose
@@ -160,18 +160,35 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
         int p_buffer_idx = buffer_read_page(table_id, page_num, &p);
         pthread_mutex_lock(&trx_latch);
         int impl_trx_id = p->slots[idx].trx_id;
-        // if (trx_table[impl_trx_id] != NULL &&
-        if (impl_trx_id != 0 &&
+        if (trx_table[impl_trx_id] != NULL &&
                 trx_table[impl_trx_id]->trx_state == ACTIVE) {
             if (impl_trx_id == trx_id) {
+                            #if verbose
+                            printf("lock_acquire(%ld, %ld, %c, %d) impl exist\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            #endif
                 pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
                 pthread_mutex_unlock(&trx_latch);
                 pthread_mutex_unlock(&lock_latch);
                 return 0;
             }
-            lock_attach(table_id, key, idx, impl_trx_id, EXCLUSIVE, 1);
+                            #if verbose
+                            printf("lock_acquire(%ld, %ld, %c, %d) attaches impl\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            printf("lock_acquire(%ld, %ld, %c, %d) attached\n", page_num, key, 'X', impl_trx_id);
+                            #endif
+            if (lock_attach(table_id, page_num, key, idx, impl_trx_id, EXCLUSIVE, 1) != 0) {
+                            #if verbose
+                            printf("?????????????????????????????????????????????????????????????????????????????????????");
+                            #endif
+            }
+                            #if verbose
+                            printf("lock_acquire(%ld, %ld, %c, %d) success\n", page_num, key, 'X', impl_trx_id);
+                            #endif
         }
         else if (lock_mode == EXCLUSIVE) {
+                            #if verbose
+                            printf("lock_acquire(%ld, %ld, %c, %d) impl~~\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            printf("lock_acquire(%ld, %ld, %c, %d) success\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            #endif
             p->slots[idx].trx_id = trx_id;
             buffer_write_page(table_id, page_num, &p);
             pthread_mutex_unlock(&trx_latch);
@@ -236,6 +253,11 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_obj->trx_next_lock = trx_table[trx_id]->head;
         trx_table[trx_id]->head = lock_obj;
         if (!from_impl) pthread_mutex_unlock(&trx_latch);
+    }
+    else {
+                            #if verbose
+                            printf("lock_acquire(%ld, %ld, %c, %d) toggle~~\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
+                            #endif
     }
     SET_BIT(lock_obj->wait_bitmap, idx);
 
@@ -321,7 +343,8 @@ void* print_locks(void* args) {
         printf("\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tpage%d : ", i);
         lock_t* lock_obj = lock_table[{568, i}].head;
         for (; lock_obj; lock_obj = lock_obj->next_lock) {
-            printf("[T%d %2ld", lock_obj->owner_trx_id, lock_obj->record_id);
+            printf("[T%d ", lock_obj->owner_trx_id);
+            for (int j = 1; j >= 0; j--) printf("%ld", GET_BIT(lock_obj->lock_bitmap, j) % 2);
             printf("%c", lock_obj->lock_mode ? 'X' : 'S');
             printf("]->");
         }
