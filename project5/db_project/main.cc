@@ -5,15 +5,15 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (50)
-#define NUM_BUFS    (100)
+#define NUM_KEYS    (10000)
+#define NUM_BUFS    (400)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (100)
+#define UPDATE_THREADS_NUMBER   (8)
 #define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (50)
+#define UPDATE_COUNT            (10000)
 #define SEARCH_COUNT            (10)
 
 std::string gen_rand_val(int size);
@@ -91,7 +91,7 @@ int main() {
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_join(search_threads[i], NULL);
 
-    print_all(table_id);
+    // print_all(table_id);
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
