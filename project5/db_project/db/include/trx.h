@@ -67,7 +67,7 @@ int trx_abort(int trx_id);
 int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key,
                  int idx, int trx_id, int lock_mode);
 int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key,
-                int idx, int trx_id, int lock_mode);
+                int idx, int trx_id, int lock_mode, int from_impl = 0);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
 
