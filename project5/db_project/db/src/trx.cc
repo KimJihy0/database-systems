@@ -209,8 +209,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     // }
     // SET_BIT(lock_obj->wait_bitmap, idx);
 
-    lock_t* cur_obj = lock_entry->head;
-    while (cur_obj != lock_obj) {
+    lock_t* cur_obj;
+    do {
         cur_obj = lock_entry->head;
         while (cur_obj != lock_obj) {
             if (cur_obj->record_id == key &&
@@ -224,11 +224,11 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
+                if (detect_deadlock(trx_id) == trx_id) {
+                    pthread_mutex_unlock(&trx_latch);
+                    return -1;
+                }
                 while (trx_table[cur_obj->owner_trx_id]->trx_state == ACTIVE) {
-                    if (detect_deadlock(trx_id) == trx_id) {
-                        pthread_mutex_unlock(&trx_latch);
-                        return -1;
-                    }
                     pthread_mutex_unlock(&trx_latch);
                     pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
                                     #if verbose
@@ -246,7 +246,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
             }
             cur_obj = cur_obj->next_lock;
         }
-    }
+    } while (cur_obj != lock_obj);
     // SET_BIT(lock_obj->lock_bitmap, idx);
     return 0;
 }
@@ -301,7 +301,7 @@ void* print_locks(void* args) {
         printf("\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\tpage%d : ", i);
         lock_t* lock_obj = lock_table[{568, i}].head;
         for (; lock_obj; lock_obj = lock_obj->next_lock) {
-            printf("[T%d %2d", lock_obj->owner_trx_id, lock_obj->record_id);
+            printf("[T%d %2ld", lock_obj->owner_trx_id, lock_obj->record_id);
             printf("%c", lock_obj->lock_mode ? 'X' : 'S');
             printf("]->");
         }
@@ -320,14 +320,12 @@ void* print_locks(void* args) {
 
 /* ---To do---
  * project4 구조 원상복귀
- * broadcast -> signal
  * lock_acquire() 1,2번째 while문 확인. (lock_bitmap? wait_bitmap?)
  * 
  * max_trx_id
  * LRU -> head, tail로 구현 가능한지 확인.
  * rollback시 value 확인
  * layer : file->buffer->trx->bpt
- * while() { pthread_cond_wait } ?
  * cmake gdb
  * pathname?????
  * detection 주기, 위치
@@ -336,6 +334,7 @@ void* print_locks(void* args) {
  * memory leak in trx_table
  * 
  * ---Done---
+ * while() { pthread_cond_wait } ?
  * log latch
  * lock_acquire()에서 deadlock detection해도 되는지. NULL return 가능한지.
  * ACTIVE, COMMITTED, ABORTED : 0,1,2 or 1,2,3

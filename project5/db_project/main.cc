@@ -29,7 +29,7 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = rand() % 4 + 25;
+        keys[i] = rand() % 4 + 26;
     std::sort(keys, keys + UPDATE_COUNT);
 
     int trx_id = trx_begin();
