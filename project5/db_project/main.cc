@@ -30,7 +30,6 @@ void* update_thread_func(void* arg) {
 
     for (int i = 0; i < UPDATE_COUNT; i++)
         keys[i] = i;
-    // std::sort(keys, keys + UPDATE_COUNT);
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -50,8 +49,7 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = rand() % 4 + 25;
-    // std::sort(keys, keys + SEARCH_COUNT);
+        keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -64,7 +62,6 @@ void* search_thread_func(void* arg) {
     return nullptr;
 }
 
-#if 1
 int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
@@ -76,7 +73,7 @@ int main() {
     printf("file creation complete(%ld).\n", table_id);
 
     // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2317);
+    // print_pgnum(table_id, 2282);
     // return 0;
 
     // print_all(table_id);
@@ -97,7 +94,6 @@ int main() {
     printf("file saved complete(%ld).\n", table_id);
     return 0;
 }
-#endif
 
 std::string gen_rand_val(int size) {
     static const std::string CHARACTERS {
