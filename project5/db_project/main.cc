@@ -5,16 +5,16 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (10000)
+#define NUM_KEYS    (50)
 #define NUM_BUFS    (100)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (8)
-#define SEARCH_THREADS_NUMBER   (1)
+#define UPDATE_THREADS_NUMBER   (100)
+#define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (5000)
-#define SEARCH_COUNT            (50)
+#define UPDATE_COUNT            (50)
+#define SEARCH_COUNT            (10)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname);
@@ -29,16 +29,16 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-    std::sort(keys, keys + UPDATE_COUNT);
+        keys[i] = i;
+    // std::sort(keys, keys + UPDATE_COUNT);
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
         db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
-        printf("Update thread is done(commit).\n");
+        printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
-        printf("Update thread is done(abort).\n");
+        printf("Update thread is done(abort).(%s)\n", (char*)value.c_str());
 
     return nullptr;
 }
@@ -50,11 +50,11 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-    std::sort(keys, keys + SEARCH_COUNT);
+        keys[i] = rand() % 4 + 25;
+    // std::sort(keys, keys + SEARCH_COUNT);
 
     int trx_id = trx_begin();
-    for (int i = 0; i < NUM_KEYS; i++)
+    for (int i = 0; i < SEARCH_COUNT; i++)
         db_find(*table_id, keys[i], ret_val, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Search thread is done(commit).\n");
@@ -75,7 +75,11 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    print_all(table_id);
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2317);
+    // return 0;
+
+    // print_all(table_id);
     
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
