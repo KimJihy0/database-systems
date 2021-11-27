@@ -138,7 +138,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
 
     lock_obj = lock_entry->head;
     while (lock_obj != NULL) {
-        if (lock_obj->record_id == key &&
+        if (GET_BIT(lock_obj->wait_bitmap, idx) != 0 &&
             lock_obj->owner_trx_id == trx_id &&
             lock_obj->lock_mode >= lock_mode) {
             pthread_mutex_unlock(&lock_latch);
@@ -150,7 +150,37 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
         lock_obj = lock_obj->next_lock;
     }
 
-    // implement implicit locking
+    lock_obj = lock_entry->head;
+    while (lock_obj != NULL) {
+        if (GET_BIT(lock_obj->wait_bitmap, idx) != 0) break;
+        lock_obj = lock_obj->next_lock;
+    }
+    if (lock_obj == NULL) {
+        page_t* p;
+        int p_buffer_idx = buffer_read_page(table_id, page_num, &p);
+        pthread_mutex_lock(&trx_latch);
+        int impl_trx_id = p->slots[idx].trx_id;
+        // if (trx_table[impl_trx_id] != NULL &&
+        if (impl_trx_id != 0 &&
+                trx_table[impl_trx_id]->trx_state == ACTIVE) {
+            if (impl_trx_id == trx_id) {
+                pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+                pthread_mutex_unlock(&trx_latch);
+                pthread_mutex_unlock(&lock_latch);
+                return 0;
+            }
+            lock_attach(table_id, key, idx, impl_trx_id, EXCLUSIVE, 1);
+        }
+        else if (lock_mode == EXCLUSIVE) {
+            p->slots[idx].trx_id = trx_id;
+            buffer_write_page(table_id, page_num, &p);
+            pthread_mutex_unlock(&trx_latch);
+            pthread_mutex_unlock(&lock_latch);
+            return 0;
+        }
+        pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+        pthread_mutex_unlock(&trx_latch);
+    }
 
     if (lock_attach(table_id, page_num, key, idx, trx_id, lock_mode) != 0) {
                             #if verbose
@@ -168,52 +198,52 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int
     return 0;
 }
 
-int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode) {
+int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int trx_id, int lock_mode, int from_impl) {
     lock_entry_t* lock_entry = &(lock_table[{table_id, page_num}]);
     lock_t* lock_obj = lock_entry->head;
 
-    // while (lock_obj != NULL) {
-    //     if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
-    //     lock_obj = lock_obj->next_lock;
-    // }
+    while (lock_obj != NULL) {
+        if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
+        lock_obj = lock_obj->next_lock;
+    }
 
-    // if (lock_obj == NULL || lock_mode == EXCLUSIVE) {
+    if (lock_obj == NULL || lock_mode == EXCLUSIVE) {
                             #if verbose
                             printf("lock_acquire(%ld, %ld, %c, %d) alloc~~\n", page_num, key, lock_mode ? 'X' : 'S', trx_id);
                             #endif
-    lock_obj = new lock_t;
-    lock_obj->prev_lock = lock_entry->tail;
-    lock_obj->next_lock = NULL;
-    lock_obj->sentinel = lock_entry;
-    lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
-    lock_obj->lock_mode = lock_mode;
-    lock_obj->record_id = key;
-    lock_obj->trx_next_lock = NULL;
-    lock_obj->owner_trx_id = trx_id;
-    // lock_obj->lock_bitmap = 0UL;
-    // lock_obj->wait_bitmap = 0UL;
+        lock_obj = new lock_t;
+        lock_obj->prev_lock = lock_entry->tail;
+        lock_obj->next_lock = NULL;
+        lock_obj->sentinel = lock_entry;
+        lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
+        lock_obj->lock_mode = lock_mode;
+        lock_obj->record_id = key;
+        lock_obj->trx_next_lock = NULL;
+        lock_obj->owner_trx_id = trx_id;
+        lock_obj->lock_bitmap = 0UL;
+        lock_obj->wait_bitmap = 0UL;
 
-    if (lock_entry->head == NULL) {
-        lock_entry->head = lock_obj;
-        lock_entry->tail = lock_obj;
-    }
-    else {
-        lock_entry->tail->next_lock = lock_obj;
-        lock_entry->tail = lock_obj;
-    }
+        if (lock_entry->head == NULL) {
+            lock_entry->head = lock_obj;
+            lock_entry->tail = lock_obj;
+        }
+        else {
+            lock_entry->tail->next_lock = lock_obj;
+            lock_entry->tail = lock_obj;
+        }
 
-    pthread_mutex_lock(&trx_latch);
-    lock_obj->trx_next_lock = trx_table[trx_id]->head;
-    trx_table[trx_id]->head = lock_obj;
-    pthread_mutex_unlock(&trx_latch);
-    // }
-    // SET_BIT(lock_obj->wait_bitmap, idx);
+        if (!from_impl) pthread_mutex_lock(&trx_latch);
+        lock_obj->trx_next_lock = trx_table[trx_id]->head;
+        trx_table[trx_id]->head = lock_obj;
+        if (!from_impl) pthread_mutex_unlock(&trx_latch);
+    }
+    SET_BIT(lock_obj->wait_bitmap, idx);
 
     lock_t* cur_obj;
     do {
         cur_obj = lock_entry->head;
-        while (cur_obj != lock_obj) {
-            if (cur_obj->record_id == key &&
+        while (cur_obj != NULL) {
+            if (GET_BIT(cur_obj->lock_bitmap, idx) != 0 &&
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
                 trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
@@ -236,8 +266,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
             }
             cur_obj = cur_obj->next_lock;
         }
-    } while (cur_obj != lock_obj);
-    // SET_BIT(lock_obj->lock_bitmap, idx);
+    } while (cur_obj != NULL);
+    SET_BIT(lock_obj->lock_bitmap, idx);
     return 0;
 }
 

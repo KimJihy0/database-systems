@@ -15,10 +15,8 @@
 #define COMMITTED   1
 #define ABORTED     2
 
-// #define GET_BIT(num,n) (((num) >> (n)) & 1U)
-// #define SET_BIT(num,n) ({ (num) |= (1UL << n); })
-// #define CLEAR_BIT(num,n) ({ (num) &= ~(1UL << n); })
-// #define TOGGLE_BIT(num,n) ({ (num) ^= (1UL << n); })
+#define GET_BIT(num,n) (((num) >> (n)) & 1U)
+#define SET_BIT(num,n) ({ (num) |= (1UL << n); })
 
 struct lock_t {
     struct lock_t* prev_lock;
@@ -29,8 +27,8 @@ struct lock_t {
     int64_t record_id;
     struct lock_t* trx_next_lock;
     int owner_trx_id;
-    // uint64_t lock_bitmap;
-    // uint64_t wait_bitmap;
+    uint64_t lock_bitmap;
+    uint64_t wait_bitmap;
 };
 
 struct log_t {
@@ -69,7 +67,7 @@ int trx_abort(int trx_id);
 int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key,
                  int idx, int trx_id, int lock_mode);
 int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key,
-                int idx, int trx_id, int lock_mode);
+                int idx, int trx_id, int lock_mode, int from_impl = 0);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
 
