@@ -27,10 +27,10 @@ int db_find(int64_t table_id, int64_t key,
     page_t * p;
     int i;
     
-    pthread_mutex_lock(&trx_latch);
+    // pthread_mutex_lock(&trx_latch);
     int trx_state = 0;
     if (trx_id) trx_state = trx_table[trx_id]->trx_state;
-    pthread_mutex_unlock(&trx_latch);
+    // pthread_mutex_unlock(&trx_latch);
     if (trx_state == ABORTED) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
@@ -65,10 +65,10 @@ int db_update(int64_t table_id, int64_t key,
     page_t * p;
     int i;
 
-    pthread_mutex_lock(&trx_latch);
+    // pthread_mutex_lock(&trx_latch);
     int trx_state = 0;
     if (trx_id) trx_state = trx_table[trx_id]->trx_state;
-    pthread_mutex_unlock(&trx_latch);
+    // pthread_mutex_unlock(&trx_latch);
     if (trx_state == ABORTED) return trx_id;
     
     p_pgnum = find_leaf(table_id, key);
