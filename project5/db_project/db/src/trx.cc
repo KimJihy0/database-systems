@@ -295,7 +295,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
 }
 
 int detect_deadlock(int trx_id) {
-    int visit[100] = {0, };
+    int visit[200] = {0, };
     pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
