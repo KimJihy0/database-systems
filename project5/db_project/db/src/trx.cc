@@ -239,6 +239,9 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         trx_entry->head = lock_obj;
     }
     else {
+                            #if verbose
+                            printf("lock_acquire(%ld, %d, %c, %d) toggle~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
+                            #endif
         if (lock_obj->prev_lock != NULL) {
         lock_obj->prev_lock->next_lock = lock_obj->next_lock;
         }
@@ -249,10 +252,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         else lock_entry->tail = lock_obj->prev_lock;
         lock_obj->prev_lock = lock_entry->tail;
         lock_obj->next_lock = NULL;
-                            #if verbose
-                            printf("lock_acquire(%ld, %d, %c, %d) toggle~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
-                            #endif
     }
+
     if (lock_entry->head == NULL) {
         lock_entry->head = lock_obj;
         lock_entry->tail = lock_obj;
@@ -294,7 +295,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
 }
 
 int detect_deadlock(int trx_id) {
-    std::unordered_map<int, int> visit;
+    int visit[100] = {0, };
     pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
