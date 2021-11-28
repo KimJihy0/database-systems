@@ -1,3 +1,6 @@
+#pragma gcc optimization("O3")
+#pragma gcc optimization("unroll-loops")
+
 #include "trx.h"
 
 pthread_mutex_t lock_latch;
@@ -295,7 +298,7 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
 }
 
 int detect_deadlock(int trx_id) {
-    int visit[200] = {0, };
+    int visit[1004] = {0, };
     pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
