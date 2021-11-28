@@ -214,13 +214,13 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     trx_entry_t* trx_entry = trx_table[trx_id];
     lock_t* lock_obj = NULL;
 
-    // if (lock_mode == SHARED) {
+    if (lock_mode == SHARED) {
         lock_obj = lock_entry->head;
         while (lock_obj != NULL) {
             if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
             lock_obj = lock_obj->next_lock;
         }
-    // }
+    }
 
     if (lock_obj == NULL) {
                             #if verbose
@@ -299,12 +299,12 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
 
 int detect_deadlock(int trx_id) {
     int visit[1004] = {0, };
-    pthread_mutex_lock(&trx_latch);
+    // pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
     } while (trx_id != 0 && !visit[trx_id]);
-    pthread_mutex_unlock(&trx_latch);
+    // pthread_mutex_unlock(&trx_latch);
     return trx_id;
 }
 
