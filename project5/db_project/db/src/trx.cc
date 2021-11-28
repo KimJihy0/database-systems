@@ -214,13 +214,13 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     trx_entry_t* trx_entry = trx_table[trx_id];
     lock_t* lock_obj = NULL;
 
-    if (lock_mode == SHARED) {
+    // if (lock_mode == SHARED) {
         lock_obj = lock_entry->head;
         while (lock_obj != NULL) {
             if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
             lock_obj = lock_obj->next_lock;
         }
-    }
+    // }
 
     if (lock_obj == NULL) {
                             #if verbose
