@@ -214,49 +214,60 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
     if (lock_mode == SHARED) {
         lock_obj = lock_entry->head;
         while (lock_obj != NULL) {
-            if (lock_obj->lock_mode == lock_mode && lock_obj->owner_trx_id == trx_id) break;
+            if (lock_obj->lock_mode == SHARED && lock_obj->owner_trx_id == trx_id) break;
             lock_obj = lock_obj->next_lock;
         }
     }
-
-    if (lock_obj == NULL) {
-                            #if verbose
-                            printf("lock_acquire(%ld, %d, %c, %d) alloc~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
-                            #endif
-        lock_obj = new lock_t;
-        lock_obj->prev_lock = lock_entry->tail;
-        lock_obj->next_lock = NULL;
-        lock_obj->sentinel = lock_entry;
-        lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
-        lock_obj->lock_mode = lock_mode;
-        // lock_obj->record_id = key;
-        // lock_obj->trx_next_lock = NULL;
-        lock_obj->owner_trx_id = trx_id;
-        lock_obj->lock_bitmap = 0UL;
-        lock_obj->wait_bitmap = 0UL;
-
-        if (lock_entry->head == NULL) {
-            lock_entry->head = lock_obj;
-            lock_entry->tail = lock_obj;
+    if (lock_obj != NULL) {
+        lock_t* cur_obj = lock_entry->head;
+        while (cur_obj != NULL) {
+            if (GET_BIT(cur_obj->wait_bitmap, idx) != 0 &&
+                cur_obj->owner_trx_id != trx_id &&
+                cur_obj->lock_mode == EXCLUSIVE) {
+                break;
+            }
+            cur_obj = cur_obj->next_lock;
         }
-        else {
-            lock_entry->tail->next_lock = lock_obj;
-            lock_entry->tail = lock_obj;
-        }
-
-        lock_obj->trx_next_lock = trx_entry->head;
-        trx_entry->head = lock_obj;
-    }
-    else {
+        if (cur_obj == NULL) {
                             #if verbose
                             printf("lock_acquire(%ld, %d, %c, %d) toggle~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
                             #endif
+            SET_BIT(lock_obj->wait_bitmap, idx);
+            SET_BIT(lock_obj->lock_bitmap, idx);
+            return 0;
+        }
     }
+                            #if verbose
+                            printf("lock_acquire(%ld, %d, %c, %d) alloc~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
+                            #endif
+    lock_obj = new lock_t;
+    lock_obj->prev_lock = lock_entry->tail;
+    lock_obj->next_lock = NULL;
+    lock_obj->sentinel = lock_entry;
+    lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
+    lock_obj->lock_mode = lock_mode;
+    lock_obj->record_id = key;
+    lock_obj->trx_next_lock = NULL;
+    lock_obj->owner_trx_id = trx_id;
+    lock_obj->lock_bitmap = 0UL;
+    lock_obj->wait_bitmap = 0UL;
     SET_BIT(lock_obj->wait_bitmap, idx);
 
+    if (lock_entry->head == NULL) {
+        lock_entry->head = lock_obj;
+        lock_entry->tail = lock_obj;
+    }
+    else {
+        lock_entry->tail->next_lock = lock_obj;
+        lock_entry->tail = lock_obj;
+    }
+
+    lock_obj->trx_next_lock = trx_entry->head;
+    trx_entry->head = lock_obj;
+
     lock_t* cur_obj = lock_entry->head;
-    while (cur_obj != NULL) {
-        if (GET_BIT(cur_obj->lock_bitmap, idx) != 0 &&
+    while (cur_obj != lock_obj) {
+        if (GET_BIT(cur_obj->wait_bitmap, idx) != 0 &&
             cur_obj->owner_trx_id != trx_id &&
             (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
             trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
