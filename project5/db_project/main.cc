@@ -5,16 +5,16 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (50)
-#define NUM_BUFS    (50)
+#define NUM_KEYS    (10000)
+#define NUM_BUFS    (200)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (5)
-#define SEARCH_THREADS_NUMBER   (5)
+#define UPDATE_THREADS_NUMBER   (8)
+#define SEARCH_THREADS_NUMBER   (1)
 
-#define UPDATE_COUNT            (5)
-#define SEARCH_COUNT            (5)
+#define UPDATE_COUNT            (10000)
+#define SEARCH_COUNT            (10000)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname);
@@ -28,8 +28,9 @@ void* update_thread_func(void* arg) {
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
     for (int i = 0; i < UPDATE_COUNT; i++)
-        // keys[i] = i;
-        keys[i] = (rand() % 2) * 26 + (rand() % 2);
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
+        // keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -49,8 +50,9 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        // keys[i] = i;
-        keys[i] = (rand() % 2) * 26 + (rand() % 2);
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
+        // keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -89,8 +91,9 @@ int main() {
         pthread_join(search_threads[i], NULL);
 
     // print_all(table_id);
-    print_pgnum(table_id, 2559);
-    print_pgnum(table_id, 2558);
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2558);
+    // print_pgnum(table_id, 2081);
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
@@ -161,8 +164,8 @@ void print_page(pagenum_t page_num, page_t page) {
 		// printf("free_space: %ld\n", page.free_space);
 		// printf("sibling: %ld\n", page.sibling);
 
-		// for (int i = 0; i < page.num_keys; i++) {
-		for (int i = 0; i < 2; i++) {
+		for (int i = 0; i < page.num_keys; i++) {
+		// for (int i = 0; i < 2; i++) {
             char value[page.slots[i].size + 1];
             memcpy(value, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
             value[page.slots[i].size] = 0;
