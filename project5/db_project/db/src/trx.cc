@@ -1,6 +1,3 @@
-#pragma gcc optimization("O3")
-#pragma gcc optimization("unroll-loops")
-
 #include "trx.h"
 
 pthread_mutex_t lock_latch;
@@ -52,7 +49,7 @@ int trx_commit(int trx_id) {
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
 
-    pthread_mutex_lock(&lock_latch);
+    // pthread_mutex_lock(&lock_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_commit(%d) start\n", trx_id);
                             #endif
@@ -74,7 +71,7 @@ int trx_commit(int trx_id) {
                             #if verbose
                             printf("\t\t\t\t\ttrx_commit(%d) end\n", trx_id);
                             #endif
-    pthread_mutex_unlock(&lock_latch);
+    // pthread_mutex_unlock(&lock_latch);
     return trx_id;
 }
 
@@ -82,7 +79,7 @@ int trx_abort(int trx_id) {
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_abort(%d)\n", trx_id);
     #endif
-    pthread_mutex_lock(&lock_latch);
+    // pthread_mutex_lock(&lock_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_abort(%d) start\n", trx_id);
                             #endif
@@ -114,7 +111,7 @@ int trx_abort(int trx_id) {
                             #if verbose
                             printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
                             #endif
-    pthread_mutex_unlock(&lock_latch);
+    // pthread_mutex_unlock(&lock_latch);
     return trx_id;
 }
 
@@ -299,16 +296,15 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
 
 int detect_deadlock(int trx_id) {
     int visit[1004] = {0, };
-    // pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
     } while (trx_id != 0 && !visit[trx_id]);
-    // pthread_mutex_unlock(&trx_latch);
     return trx_id;
 }
 
 int lock_release(lock_t* lock_obj) {
+    pthread_mutex_lock(&lock_latch);
     lock_entry_t* lock_entry = lock_obj->sentinel;
     if (lock_obj->prev_lock != NULL) {
         lock_obj->prev_lock->next_lock = lock_obj->next_lock;
@@ -319,6 +315,7 @@ int lock_release(lock_t* lock_obj) {
     }
     else lock_entry->tail = lock_obj->prev_lock;
     pthread_cond_broadcast(&(lock_obj->cond_var));
+    pthread_mutex_unlock(&lock_latch);
     return 0;
 }
 

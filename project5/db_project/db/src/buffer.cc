@@ -1,6 +1,3 @@
-#pragma gcc optimization("O3")
-#pragma gcc optimization("unroll-loops")
-
 #include "buffer.h"
 
 buffer_t ** buffers;
