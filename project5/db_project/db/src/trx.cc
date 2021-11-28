@@ -234,54 +234,61 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_obj->owner_trx_id = trx_id;
         lock_obj->lock_bitmap = 0UL;
         lock_obj->wait_bitmap = 0UL;
-
-        if (lock_entry->head == NULL) {
-            lock_entry->head = lock_obj;
-            lock_entry->tail = lock_obj;
-        }
-        else {
-            lock_entry->tail->next_lock = lock_obj;
-            lock_entry->tail = lock_obj;
-        }
-
-        lock_obj->trx_next_lock = trx_entry->head;
-        trx_entry->head = lock_obj;
     }
     else {
+        if (lock_obj->prev_lock != NULL) {
+        lock_obj->prev_lock->next_lock = lock_obj->next_lock;
+        }
+        else lock_entry->head = lock_obj->next_lock;
+        if (lock_obj->next_lock != NULL) {
+            lock_obj->next_lock->prev_lock = lock_obj->prev_lock;
+        }
+        else lock_entry->tail = lock_obj->prev_lock;
+        lock_obj->prev_lock = lock_entry->tail;
+        lock_obj->next_lock = NULL;
                             #if verbose
                             printf("lock_acquire(%ld, %d, %c, %d) toggle~~\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
                             #endif
     }
+    if (lock_entry->head == NULL) {
+        lock_entry->head = lock_obj;
+        lock_entry->tail = lock_obj;
+    }
+    else {
+        lock_entry->tail->next_lock = lock_obj;
+        lock_entry->tail = lock_obj;
+    }
+
+    lock_obj->trx_next_lock = trx_entry->head;
+    trx_entry->head = lock_obj;
     SET_BIT(lock_obj->wait_bitmap, idx);
 
-    lock_t* cur_obj;
-    do {
-        cur_obj = lock_entry->head;
-        while (cur_obj != NULL) {
-            if (GET_BIT(cur_obj->lock_bitmap, idx) != 0 &&
-                cur_obj->owner_trx_id != trx_id &&
-                (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
-                trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
+    lock_t* cur_obj = lock_entry->head;
+    while (cur_obj != lock_obj) {
+        if (GET_BIT(cur_obj->wait_bitmap, idx) != 0 &&
+            cur_obj->owner_trx_id != trx_id &&
+            (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
+            trx_entry->waits_for_trx_id = cur_obj->owner_trx_id;
+                            #if verbose
+                            if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, idx);
+                            else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, idx);
+                            print_waits_for_graph();
+                            print_locks(NULL);
+                            #endif
+            if (detect_deadlock(trx_id) == trx_id) return -1;
+            pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
                                 #if verbose
-                                if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, page_num, key);
-                                else printf("trx %d waits for trx %d to read (%ld, %ld)\n", trx_id, trx_entry->waits_for_trx_id, table_id, key);
+                                if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, page_num, idx);
+                                else printf("trx %d wakes up trx %d to read (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, page_num, idx);
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
-                if (detect_deadlock(trx_id) == trx_id) return -1;
-                pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-                                    #if verbose
-                                    if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, page_num, key);
-                                    else printf("trx %d wakes up trx %d to read (%ld, %ld)\n", trx_entry->waits_for_trx_id, trx_id, table_id, key);
-                                    print_waits_for_graph();
-                                    print_locks(NULL);
-                                    #endif
-                trx_entry->waits_for_trx_id = 0;
-                break;
-            }
-            cur_obj = cur_obj->next_lock;
+            cur_obj = lock_entry->head;
+            trx_entry->waits_for_trx_id = 0;
+            continue;
         }
-    } while (cur_obj != NULL);
+        cur_obj = cur_obj->next_lock;
+    }
     SET_BIT(lock_obj->lock_bitmap, idx);
     return 0;
 }

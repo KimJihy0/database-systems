@@ -65,6 +65,7 @@ void* search_thread_func(void* arg) {
     return nullptr;
 }
 
+#if 0
 int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
@@ -99,6 +100,7 @@ int main() {
     printf("file saved complete(%ld).\n", table_id);
     return 0;
 }
+#endif
 
 std::string gen_rand_val(int size) {
     static const std::string CHARACTERS {
@@ -230,7 +232,7 @@ void print_all(int64_t table_id) {
     pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
 }
 
-#if 0
+#if 1
 int main() {
     std::random_device rd;
 	std::mt19937 gen(rd());
@@ -250,6 +252,7 @@ int main() {
 
     init_db(NUM_BUFS);
 	int64_t table_id = open_table((char*)"table0");
+    int trx_id = trx_begin();
     for (int j = 0; j < 3; j++) {
         shuffle(keys.begin(), keys.end(), rng);
 
@@ -268,7 +271,7 @@ int main() {
             memset(value, 0x00, 112);
             val_size = 0;
             // printf("find %4d\n", i);
-            if(db_find(table_id, i, value, &val_size, 0) != 0) goto func_exit;
+            if(db_find(table_id, i, value, &val_size, trx_id) != 0) goto func_exit;
             // else if (SIZE(i) != val_size ||
             // 		 val(i) != std::string(value, val_size)) {
             // 	printf("value dismatched\n");
@@ -291,13 +294,14 @@ int main() {
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
             val_size = 0;
-            if (db_find(table_id, i, value, &val_size, 0) == 0) goto func_exit;
+            if (db_find(table_id, i, value, &val_size, trx_id) == 0) goto func_exit;
         }
         printf("\t[FIND END AGAIN]\n");
 
         // print_tree(table_id);
         // printf("\n");
     }
+    trx_commit(trx_id);
 
     printf("\n[TEST END]\n\n");    
 
