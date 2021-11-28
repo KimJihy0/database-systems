@@ -234,6 +234,9 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_obj->owner_trx_id = trx_id;
         lock_obj->lock_bitmap = 0UL;
         lock_obj->wait_bitmap = 0UL;
+
+        lock_obj->trx_next_lock = trx_entry->head;
+        trx_entry->head = lock_obj;
     }
     else {
         if (lock_obj->prev_lock != NULL) {
@@ -258,9 +261,6 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
         lock_entry->tail->next_lock = lock_obj;
         lock_entry->tail = lock_obj;
     }
-
-    lock_obj->trx_next_lock = trx_entry->head;
-    trx_entry->head = lock_obj;
     SET_BIT(lock_obj->wait_bitmap, idx);
 
     lock_t* cur_obj = lock_entry->head;
@@ -283,8 +283,8 @@ int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key, int idx, int 
                                 print_waits_for_graph();
                                 print_locks(NULL);
                                 #endif
-            cur_obj = lock_entry->head;
             trx_entry->waits_for_trx_id = 0;
+            cur_obj = lock_entry->head;
             continue;
         }
         cur_obj = cur_obj->next_lock;
