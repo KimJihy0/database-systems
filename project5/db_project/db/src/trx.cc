@@ -36,6 +36,7 @@ int trx_begin() {
 
 int trx_commit(int trx_id) {
     if (trx_table[trx_id]->trx_state == ABORTED) return 0;
+    
     pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
@@ -56,8 +57,6 @@ int trx_commit(int trx_id) {
 }
 
 int trx_abort(int trx_id) {
-    pthread_mutex_lock(&lock_latch);
-
     page_t * p;
     log_t* log;
     while (!(trx_table[trx_id]->logs.empty())) {
@@ -67,6 +66,8 @@ int trx_abort(int trx_id) {
         buffer_write_page(log->table_id, log->page_num, &p);
         trx_table[trx_id]->logs.pop();
     }
+
+    pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
@@ -163,8 +164,10 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
 
     // lock allocation
     lock_obj = lock_alloc(table_id, page_num, idx, trx_id, lock_mode);
-    lock_t* cur_obj = lock_entry->head;
-    while (cur_obj != lock_obj) {
+
+    // deadlock detection
+    lock_t* cur_obj = lock_obj->prev_lock;
+    while (cur_obj != NULL) {
         if (GET_BIT(cur_obj->bitmap, idx) != 0 &&
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
@@ -175,10 +178,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
             }
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
-            cur_obj = lock_entry->head;
-            continue;
+            break;
         }
-        cur_obj = cur_obj->next_lock;
+        cur_obj = cur_obj->prev_lock;
     }
 
     pthread_mutex_unlock(&lock_latch);
