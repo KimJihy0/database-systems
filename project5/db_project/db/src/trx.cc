@@ -57,16 +57,6 @@ int trx_commit(int trx_id) {
 }
 
 int trx_abort(int trx_id) {
-    page_t * p;
-    log_t* log;
-    while (!(trx_table[trx_id]->logs.empty())) {
-        log = &(trx_table[trx_id]->logs.top());
-        buffer_read_page(log->table_id, log->page_num, &p);
-        memcpy(p->values + log->offset, log->old_value, log->size);
-        buffer_write_page(log->table_id, log->page_num, &p);
-        trx_table[trx_id]->logs.pop();
-    }
-
     pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
@@ -223,20 +213,24 @@ int detect_deadlock(int trx_id) {
 
 int lock_release(lock_t* lock_obj) {
     lock_entry_t* lock_entry = lock_obj->sentinel;
+
     if (lock_obj->prev_lock != NULL)
         lock_obj->prev_lock->next_lock = lock_obj->next_lock;
     else lock_entry->head = lock_obj->next_lock;
     if (lock_obj->next_lock != NULL)
         lock_obj->next_lock->prev_lock = lock_obj->prev_lock;
     else lock_entry->tail = lock_obj->prev_lock;
+
     pthread_cond_broadcast(&(lock_obj->cond_var));
+
     return 0;
 }
 
 /* ---To do---
- * project4 구조 원상복귀
  * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
  * max_trx_id
+ * 
+ * project4 구조 원상복귀
  * rollback시 value 확인?
  * cmake gdb
  * pathname?????

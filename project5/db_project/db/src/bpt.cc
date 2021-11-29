@@ -82,12 +82,8 @@ int db_update(int64_t table_id, int64_t key,
     buffer_read_page(table_id, p_pgnum, &p);
     uint16_t offset = p->slots[i].offset - HEADER_SIZE;
     uint16_t size = p->slots[i].size;
-    log_t log(table_id, p_pgnum, offset, size);
-    memcpy(log.old_value, p->values + offset, size);
     memcpy(p->values + offset, value, new_val_size);
-    memcpy(log.new_value, p->values + offset, size);
     *old_val_size = size;
-    trx_table[trx_id]->logs.push(log);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;

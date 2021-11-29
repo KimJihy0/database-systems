@@ -27,17 +27,6 @@ struct lock_t {
     uint64_t bitmap;
 };
 
-struct log_t {
-    log_t(int64_t table_id, pagenum_t page_num, uint16_t offset, uint16_t size) :
-        table_id(table_id), page_num(page_num), offset(offset), size(size) {}
-    int64_t table_id;
-    pagenum_t page_num;
-    uint16_t offset;
-    uint16_t size;
-    char old_value[108];
-    char new_value[108];
-};
-
 struct lock_entry_t {
     struct lock_t* head;
     struct lock_t* tail;
@@ -47,7 +36,6 @@ struct trx_entry_t {
     struct lock_t* head;
     int waits_for_trx_id;
     int trx_state;
-    std::stack<log_t> logs;
 };
 
 extern std::unordered_map<int, trx_entry_t*> trx_table;
