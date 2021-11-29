@@ -3,9 +3,9 @@
 table_t tables[NUM_BUCKETS];
 
 int64_t file_open_table_file(const char * pathname) {
-	int fd = open(pathname, O_RDWR|O_CREAT|O_EXCL, 0644);
+	int fd = open(pathname, O_RDWR|O_CREAT|O_EXCL|O_SYNC, 0644);
 	if (fd < 0 && errno == EEXIST) {
-		fd = open(pathname, O_RDWR);
+		fd = open(pathname, O_RDWR|O_SYNC);
 		if (fd < 0) {
 			perror("Failure to open table file(open error)");
 			exit(EXIT_FAILURE);
@@ -25,7 +25,7 @@ int64_t file_open_table_file(const char * pathname) {
 			perror("Failure to open table file(write error)");
 			exit(EXIT_FAILURE);
 		}
-		fsync(fd);
+		// fsync(fd);
 
 		page_t p;
 		for (int i = 1; i < INITIAL_PAGENUM; i++) {
@@ -34,7 +34,7 @@ int64_t file_open_table_file(const char * pathname) {
 				perror("Failure to open table file(write error)");
 				exit(EXIT_FAILURE);
 			}
-			fsync(fd);
+			// fsync(fd);
 		}
 	}
     
@@ -76,7 +76,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 			perror("Failure to alloc page(write error)");
 			exit(EXIT_FAILURE);
 		}
-		fsync(fd);
+		// fsync(fd);
 
 		pagenum_t i;
 		for(i = page_num + 1; i < 2 * page_num; i++) {
@@ -85,7 +85,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 				perror("Failure to alloc page(write error)");
 				exit(EXIT_FAILURE);
 			}
-			fsync(fd);
+			// fsync(fd);
 		}
 
 		header.next_frpg = i - 1;
@@ -106,7 +106,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 		perror("Failure to alloc page(write error)");
 		exit(EXIT_FAILURE);
 	}
-	fsync(fd);
+	// fsync(fd);
 
 	return page_num;
 }
@@ -128,7 +128,7 @@ void file_free_page(int64_t table_id, pagenum_t page_num) {
 		perror("Failure to free page(write error)");
 		exit(EXIT_FAILURE);
 	}
-	fsync(fd);
+	// fsync(fd);
 
 	header.next_frpg = page_num;
 	lseek(fd, 0, SEEK_SET);
@@ -136,7 +136,7 @@ void file_free_page(int64_t table_id, pagenum_t page_num) {
 		perror("Failure to free page(write error)");
 		exit(EXIT_FAILURE);
 	}
-	fsync(fd);
+	// fsync(fd);
 }
 
 void file_read_page(int64_t table_id, pagenum_t page_num, page_t * dest) {
@@ -157,7 +157,7 @@ void file_write_page(int64_t table_id, pagenum_t page_num, const page_t * src) {
 		perror("Failure to write page(write error)");
 		exit(EXIT_FAILURE);
 	}
-	fsync(fd);
+	// fsync(fd);
 }
 
 void file_close_table_file() {
