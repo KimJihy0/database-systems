@@ -41,13 +41,12 @@ int db_find(int64_t table_id, int64_t key,
 
     if (i == num_keys) return -1;
     if (ret_val == NULL || val_size == NULL || trx_id == 0) return -2;
-    if (lock_acquire(table_id, p_pgnum, key, i, trx_id, SHARED) != 0) {
+    if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
 
-    // p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
-    pthread_mutex_lock(&(buffers[p_buffer_idx]->page_latch));
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
     *val_size = p->slots[i].size;
     pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
@@ -75,7 +74,7 @@ int db_update(int64_t table_id, int64_t key,
     
     if (i == num_keys) return -1;
     if (old_val_size == NULL || trx_id == 0) return -2;
-    if (lock_acquire(table_id, p_pgnum, key, i, trx_id, EXCLUSIVE) != 0) {
+    if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE) != 0) {
         trx_abort(trx_id);
         return trx_id;
     }
@@ -83,12 +82,12 @@ int db_update(int64_t table_id, int64_t key,
     buffer_read_page(table_id, p_pgnum, &p);
     uint16_t offset = p->slots[i].offset - HEADER_SIZE;
     uint16_t size = p->slots[i].size;
-    // log_t log(table_id, p_pgnum, offset, size);
-    // memcpy(log.old_value, p->values + offset, size);
+    log_t log(table_id, p_pgnum, offset, size);
+    memcpy(log.old_value, p->values + offset, size);
     memcpy(p->values + offset, value, new_val_size);
-    // memcpy(log.new_value, p->values + offset, size);
+    memcpy(log.new_value, p->values + offset, size);
     *old_val_size = size;
-    // trx_table[trx_id]->logs.push(log);
+    trx_table[trx_id]->logs.push(log);
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;
@@ -169,6 +168,7 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
         leaf->slots[i].key = leaf->slots[i - 1].key;
         leaf->slots[i].size = leaf->slots[i - 1].size;
         leaf->slots[i].offset = leaf->slots[i - 1].offset;
+        leaf->slots[i].trx_id = leaf->slots[i - 1].trx_id;
     }
     leaf->slots[insertion_index].key = key;
     leaf->slots[insertion_index].size = val_size;
@@ -205,6 +205,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         temp_slots[j].key = leaf->slots[i].key;
         temp_slots[j].size = leaf->slots[i].size;
         temp_slots[j].offset = leaf->slots[i].offset;
+        temp_slots[j].trx_id = leaf->slots[i].trx_id;
     }
     temp_slots[insertion_index].key = key;
     temp_slots[insertion_index].size = val_size;
@@ -232,6 +233,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         leaf->slots[i].key = temp_slots[i].key;
         leaf->slots[i].size = temp_slots[i].size;
         leaf->slots[i].offset = offset + HEADER_SIZE;
+        leaf->slots[i].trx_id = temp_slots[i].trx_id;
         memcpy(leaf->values + offset,
                 temp_values + temp_slots[i].offset - HEADER_SIZE, temp_slots[i].size);
         leaf->num_keys++;
@@ -244,6 +246,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         new_leaf->slots[j].key = temp_slots[i].key;
         new_leaf->slots[j].size = temp_slots[i].size;
         new_leaf->slots[j].offset = offset + HEADER_SIZE;
+        new_leaf->slots[j].trx_id = temp_slots[i].trx_id;
         memcpy(new_leaf->values + offset,
                 temp_values + temp_slots[i].offset - HEADER_SIZE, temp_slots[i].size);
         new_leaf->num_keys++;

@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define NUM_KEYS    (10000)
-#define NUM_BUFS    (200)
+#define NUM_BUFS    (100)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
@@ -27,6 +27,7 @@ void* update_thread_func(void* arg) {
     uint16_t old_size;
     int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
+
     for (int i = 0; i < UPDATE_COUNT; i++)
         // keys[i] = rand() % NUM_KEYS;
         keys[i] = i;
@@ -65,7 +66,7 @@ void* search_thread_func(void* arg) {
     return nullptr;
 }
 
-#if 0
+#if 1
 int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
@@ -76,11 +77,15 @@ int main() {
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
 
-    // print_all(table_id);
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2558);
+    // char ret_val[108];
+    // uint16_t old_size;
+    // int trx_id = trx_begin();
+    // for (int i = 0; i < 50; i++)
+    //     // db_find(table_id, i, ret_val, &old_size, trx_id);
+    //     db_update(table_id, i, (char*)"??", 2, &old_size, trx_id);
+    // trx_commit(trx_id);
     // return 0;
-    
+
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
@@ -92,10 +97,6 @@ int main() {
         pthread_join(search_threads[i], NULL);
 
     // print_all(table_id);
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2558);
-    // print_pgnum(table_id, 2081);
-
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
     return 0;
@@ -133,11 +134,7 @@ int create_db(const char* pathname) {
 	}
     shuffle(keys.begin(), keys.end(), rng);
 	int64_t table_id = open_table((char*)pathname);
-    // for (const auto& i : keys) {
-    //     sprintf(value, "%02d", i % 100);
-    //     if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
-    // }
-    for (int i = 0; i < NUM_KEYS; i++) {
+    for (const auto& i : keys) {
         sprintf(value, "%02d", i % 100);
         if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
     }
@@ -167,7 +164,6 @@ void print_page(pagenum_t page_num, page_t page) {
 		// printf("sibling: %ld\n", page.sibling);
 
 		for (int i = 0; i < page.num_keys; i++) {
-		// for (int i = 0; i < 2; i++) {
             char value[page.slots[i].size + 1];
             memcpy(value, page.values + page.slots[i].offset - HEADER_SIZE, page.slots[i].size);
             value[page.slots[i].size] = 0;
@@ -232,7 +228,7 @@ void print_all(int64_t table_id) {
     pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
 }
 
-#if 1
+#if 0
 int main() {
     std::random_device rd;
 	std::mt19937 gen(rd());

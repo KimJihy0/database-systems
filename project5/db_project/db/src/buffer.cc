@@ -5,11 +5,10 @@ int buffer_size;
 pthread_mutex_t buffer_latch;
 
 int init_buffer(int num_buf) {
-    int i;
     buffer_size = num_buf;
     buffers = (buffer_t **)malloc(buffer_size * sizeof(buffer_t *));
     if (buffers == NULL) return -1;
-    for (i = 0; i < buffer_size; i++) {
+    for (int i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
     pthread_mutex_init(&buffer_latch, 0);
@@ -17,8 +16,7 @@ int init_buffer(int num_buf) {
 }
 
 int shutdown_buffer() {
-    int i;
-    for (i = 0; i < buffer_size; i++) {
+    for (int i = 0; i < buffer_size; i++) {
         if (buffers[i] != NULL) {
             file_write_page(buffers[i]->table_id,
                             buffers[i]->page_num,
@@ -32,25 +30,22 @@ int shutdown_buffer() {
 }
 
 int buffer_get_first_LRU_idx() {
-    int i;
-    for (i = 0; i < buffer_size; i++)
+    for (int i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL && buffers[i]->prev_LRU == NULL) return i;
     return -1;
 }
 
 int buffer_get_last_LRU_idx() {
-    int i;
-    for (i = 0; i < buffer_size; i++)
+    for (int i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL && buffers[i]->next_LRU == NULL) return i;
     return -1;
 }
 
 int buffer_get_buffer_idx(int64_t table_id, pagenum_t page_num) {
-    int i;
-    for (i = 0; i < buffer_size; i++)
+    for (int i = 0; i < buffer_size; i++)
         if (buffers[i] != NULL &&
-            buffers[i]->table_id == table_id &&
-            buffers[i]->page_num == page_num)
+                buffers[i]->table_id == table_id &&
+                buffers[i]->page_num == page_num)
             return i;
     return -1;
 }
@@ -93,9 +88,9 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
     }
     else pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
 
-    if (buffers[buffer_idx]->prev_LRU)
+    if (buffers[buffer_idx]->prev_LRU != NULL)
         buffers[buffer_idx]->prev_LRU->next_LRU = buffers[buffer_idx]->next_LRU;
-    if (buffers[buffer_idx]->next_LRU)
+    if (buffers[buffer_idx]->next_LRU != NULL)
         buffers[buffer_idx]->next_LRU->prev_LRU = buffers[buffer_idx]->prev_LRU;
     buffers[buffer_idx]->next_LRU = buffers[buffer_idx];
     buffers[buffer_idx]->prev_LRU = buffers[buffer_idx];
@@ -117,8 +112,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
 pagenum_t buffer_alloc_page(int64_t table_id) {
     pagenum_t page_num;
     page_t * header, * alloc;
-    int header_buffer_idx, alloc_buffer_idx;
-    header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
     if (header->next_frpg == 0) {
         if (header_buffer_idx != -1) {
             if (buffers[header_buffer_idx]->is_dirty)
@@ -133,7 +127,7 @@ pagenum_t buffer_alloc_page(int64_t table_id) {
         return page_num;
     }
     page_num = header->next_frpg;
-    alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
+    int alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
     header->next_frpg = alloc->next_frpg;
     pthread_mutex_unlock(&(buffers[alloc_buffer_idx]->page_latch));
     buffer_write_page(table_id, 0, &header);

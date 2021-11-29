@@ -3,8 +3,7 @@
 table_t tables[NUM_BUCKETS];
 
 int64_t file_open_table_file(const char * pathname) {
-	int fd;
-	fd = open(pathname, O_RDWR|O_CREAT|O_EXCL, 0644);
+	int fd = open(pathname, O_RDWR|O_CREAT|O_EXCL, 0644);
 	if (fd < 0 && errno == EEXIST) {
 		fd = open(pathname, O_RDWR);
 		if (fd < 0) {
@@ -57,8 +56,7 @@ int64_t file_open_table_file(const char * pathname) {
 }
 
 pagenum_t file_alloc_page(int64_t table_id) {
-	int fd;
-	fd = tables[table_id % NUM_BUCKETS].fd;
+	int fd = tables[table_id % NUM_BUCKETS].fd;
 
 	page_t header;
 	lseek(fd, 0, SEEK_SET);
@@ -114,8 +112,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
 }
 
 void file_free_page(int64_t table_id, pagenum_t page_num) {
-	int fd;
-	fd = tables[table_id % NUM_BUCKETS].fd;
+	int fd = tables[table_id % NUM_BUCKETS].fd;
 
 	page_t header;
 	lseek(fd, 0, SEEK_SET);
@@ -143,8 +140,7 @@ void file_free_page(int64_t table_id, pagenum_t page_num) {
 }
 
 void file_read_page(int64_t table_id, pagenum_t page_num, page_t * dest) {
-	int fd;
-	fd = tables[table_id % NUM_BUCKETS].fd;
+	int fd  = tables[table_id % NUM_BUCKETS].fd;
 
 	lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
 	if (read(fd, dest, PAGE_SIZE) != PAGE_SIZE) {
@@ -154,8 +150,7 @@ void file_read_page(int64_t table_id, pagenum_t page_num, page_t * dest) {
 }
 
 void file_write_page(int64_t table_id, pagenum_t page_num, const page_t * src) {
-	int fd;
-	fd = tables[table_id % NUM_BUCKETS].fd;
+	int fd = tables[table_id % NUM_BUCKETS].fd;
 
 	lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
 	if (write(fd, src, PAGE_SIZE) != PAGE_SIZE) {

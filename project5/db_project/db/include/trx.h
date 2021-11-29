@@ -2,11 +2,8 @@
 #define DB_TRX_H_
 
 #include "buffer.h"
-#include <pthread.h>
 #include <unordered_map>
 #include <stack>
-
-#define verbose     0
 
 #define SHARED      0
 #define EXCLUSIVE   1
@@ -15,20 +12,19 @@
 #define COMMITTED   1
 #define ABORTED     2
 
-#define GET_BIT(num,n) (((num) >> (n)) & 1U)
-#define SET_BIT(num,n) ({ (num) |= (1UL << n); })
+#define INIT_BIT(n)     (1UL << (n))
+#define GET_BIT(num,n)  (((num) >> (n)) & 1U)
+#define SET_BIT(num,n)  ({ (num) |= (1UL << (n)); })
 
 struct lock_t {
     struct lock_t* prev_lock;
     struct lock_t* next_lock;
     struct lock_entry_t* sentinel;
     pthread_cond_t cond_var;
-    int lock_mode;
-    int64_t record_id;
     struct lock_t* trx_next_lock;
+    int lock_mode;
     int owner_trx_id;
-    uint64_t lock_bitmap;
-    uint64_t wait_bitmap;
+    uint64_t bitmap;
 };
 
 struct log_t {
@@ -63,16 +59,11 @@ int trx_begin();
 int trx_commit(int trx_id);
 int trx_abort(int trx_id);
 
-int lock_acquire(int64_t table_id, pagenum_t page_num, int64_t key,
+int lock_acquire(int64_t table_id, pagenum_t page_num,
                  int idx, int trx_id, int lock_mode);
-int lock_attach(int64_t table_id, pagenum_t page_num, int64_t key,
-                int idx, int trx_id, int lock_mode);
+lock_t* lock_alloc(int64_t table_id, pagenum_t page_num,
+                   int idx, int trx_id, int lock_mode);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
-
-#if verbose
-void print_waits_for_graph();
-void* print_locks(void* args);
-#endif
 
 #endif
