@@ -80,10 +80,8 @@ int db_update(int64_t table_id, int64_t key,
     }
 
     buffer_read_page(table_id, p_pgnum, &p);
-    uint16_t offset = p->slots[i].offset - HEADER_SIZE;
-    uint16_t size = p->slots[i].size;
-    memcpy(p->values + offset, value, new_val_size);
-    *old_val_size = size;
+    memcpy(p->values + p->slots[i].offset - HEADER_SIZE, value, new_val_size);
+    *old_val_size = p->slots[i].size;
     buffer_write_page(table_id, p_pgnum, &p);
 
     return 0;
