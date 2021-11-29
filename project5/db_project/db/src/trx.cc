@@ -156,8 +156,8 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
     lock_obj = lock_alloc(table_id, page_num, idx, trx_id, lock_mode);
 
     // deadlock detection
-    lock_t* cur_obj = lock_obj->prev_lock;
-    while (cur_obj != NULL) {
+    lock_t* cur_obj = lock_entry->head;
+    while (cur_obj != lock_obj) {
         if (GET_BIT(cur_obj->bitmap, idx) != 0 &&
                 cur_obj->owner_trx_id != trx_id &&
                 (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
@@ -168,10 +168,10 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
             }
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
-            cur_obj = lock_obj->prev_lock;
+            cur_obj = lock_entry->head;
             continue;
         }
-        cur_obj = cur_obj->prev_lock;
+        cur_obj = cur_obj->next_lock;
     }
 
     pthread_mutex_unlock(&lock_latch);
