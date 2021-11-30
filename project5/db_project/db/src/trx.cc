@@ -234,6 +234,7 @@ int lock_release(lock_t* lock_obj) {
  * buffer_request_page()에서 alloc인경우 처리하고 return
  * #define UNPIN(i)
  * shutdown_buffer()에서 is_dirty인 경우만 flush
+ * log 뺐는데 맞는지 몰겠음.
  * 
  * project4 구조 원상복귀
  * rollback시 value 확인?

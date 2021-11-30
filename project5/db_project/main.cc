@@ -262,6 +262,21 @@ int main() {
         }
         printf("\t[INSERT END]\n");
 
+        // for (int i = 0; i < 100000; i++)
+        //     db_find(table_id, rand() % NUM_KEYS, value, &val_size, trx_id);
+        
+        // for (int i = 0; i < 3; i++)
+        //     printf("%d : %fsec\n", i, clocks[i] / CLOCKS_PER_SEC);
+
+        // for (int j = 0; j < 10; j++)
+        //     for (int i = 0; i < 10000; i++)
+        //         db_find(table_id, i, value, &val_size, trx_id);
+
+        // for (int i = 0; i < 3; i++)
+        //     printf("%d : %fsec\n", i, clocks[i] / CLOCKS_PER_SEC);
+
+        // return 0;
+
         printf("\t[FIND START]\n");
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
