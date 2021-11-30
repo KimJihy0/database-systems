@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define NUM_KEYS    (10000)
-#define NUM_BUFS    (100)
+#define NUM_BUFS    (400)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
@@ -66,7 +66,7 @@ void* search_thread_func(void* arg) {
     return nullptr;
 }
 
-#if 1
+#if 0
 int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
@@ -228,7 +228,7 @@ void print_all(int64_t table_id) {
     pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
 }
 
-#if 0
+#if 1
 int main() {
     std::random_device rd;
 	std::mt19937 gen(rd());

@@ -41,10 +41,10 @@ int db_find(int64_t table_id, int64_t key,
 
     if (i == num_keys) return -1;
     if (ret_val == NULL || val_size == NULL || trx_id == 0) return -2;
-    if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED) != 0) {
-        trx_abort(trx_id);
-        return trx_id;
-    }
+    // if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED) != 0) {
+    //     trx_abort(trx_id);
+    //     return trx_id;
+    // }
 
     p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     memcpy(ret_val, p->values + p->slots[i].offset - HEADER_SIZE, p->slots[i].size);
@@ -74,10 +74,10 @@ int db_update(int64_t table_id, int64_t key,
     
     if (i == num_keys) return -1;
     if (old_val_size == NULL || trx_id == 0) return -2;
-    if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE) != 0) {
-        trx_abort(trx_id);
-        return trx_id;
-    }
+    // if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE) != 0) {
+    //     trx_abort(trx_id);
+    //     return trx_id;
+    // }
 
     buffer_read_page(table_id, p_pgnum, &p);
     memcpy(p->values + p->slots[i].offset - HEADER_SIZE, value, new_val_size);

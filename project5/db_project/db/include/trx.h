@@ -3,7 +3,6 @@
 
 #include "buffer.h"
 #include <unordered_map>
-#include <stack>
 
 #define SHARED      0
 #define EXCLUSIVE   1
