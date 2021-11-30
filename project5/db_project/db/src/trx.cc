@@ -230,6 +230,9 @@ int lock_release(lock_t* lock_obj) {
  * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
  * max_trx_id
  * bpt에서 trx_id 초기화 지우기
+ * buffer_get_index()에서 NULL이면 return
+ * buffer_request_page()에서 alloc인경우 처리하고 return
+ * #define UNPIN(i) 
  * 
  * project4 구조 원상복귀
  * rollback시 value 확인?
