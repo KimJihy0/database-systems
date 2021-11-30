@@ -18,9 +18,11 @@ int init_buffer(int num_buf) {
 int shutdown_buffer() {
     for (int i = 0; i < buffer_size; i++) {
         if (buffers[i] != NULL) {
-            file_write_page(buffers[i]->table_id,
-                            buffers[i]->page_num,
-                            &(buffers[i]->frame));
+            if (buffers[i]->is_dirty != 0) {
+                file_write_page(buffers[i]->table_id,
+                                buffers[i]->page_num,
+                                &(buffers[i]->frame));
+            }
             delete buffers[i];
         }
     }

@@ -29,10 +29,22 @@ int db_find(int64_t table_id, int64_t key,
     
     if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
 
-    p_pgnum = find_leaf(table_id, key);
+    int p_buffer_idx = buffer_read_page(table_id, 0, &p);
+    p_pgnum = p->root_num;
+    pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     if (p_pgnum == 0) return -1;
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    while (!p->is_leaf) {
+        int i = 0;
+        while (i < p->num_keys) {
+            if (key >= p->entries[i].key) i++;
+            else break;
+        }
+        p_pgnum = i ? p->entries[i - 1].child : p->left_child;
+        pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+        p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    }
 
-    int p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     int num_keys = p->num_keys;
     for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
@@ -62,10 +74,22 @@ int db_update(int64_t table_id, int64_t key,
 
     if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
     
-    p_pgnum = find_leaf(table_id, key);
+    int p_buffer_idx = buffer_read_page(table_id, 0, &p);
+    p_pgnum = p->root_num;
+    pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     if (p_pgnum == 0) return -1;
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    while (!p->is_leaf) {
+        int i = 0;
+        while (i < p->num_keys) {
+            if (key >= p->entries[i].key) i++;
+            else break;
+        }
+        p_pgnum = i ? p->entries[i - 1].child : p->left_child;
+        pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+        p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    }
 
-    int p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     int num_keys = p->num_keys;
     for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
@@ -89,12 +113,12 @@ int db_update(int64_t table_id, int64_t key,
 
 pagenum_t find_leaf(int64_t table_id, int64_t key) {
     pagenum_t p_pgnum;
-    page_t * p, * header;
-    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    p_pgnum = header->root_num;
-    pthread_mutex_unlock(&(buffers[header_buffer_idx]->page_latch));
+    page_t * p;
+    int p_buffer_idx = buffer_read_page(table_id, 0, &p);
+    p_pgnum = p->root_num;
+    pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
     if (p_pgnum == 0) return 0;
-    int p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
+    p_buffer_idx = buffer_read_page(table_id, p_pgnum, &p);
     while (!p->is_leaf) {
         int i = 0;
         while (i < p->num_keys) {
