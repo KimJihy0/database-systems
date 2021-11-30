@@ -100,11 +100,11 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         buffer->prev_LRU->next_LRU = buffer->next_LRU;
     if (buffer->next_LRU != NULL)
         buffer->next_LRU->prev_LRU = buffer->prev_LRU;
-    buffer->next_LRU = buffers[buffer_idx];
-    buffer->prev_LRU = buffers[buffer_idx];
+    buffer->next_LRU = buffer;
+    buffer->prev_LRU = buffer;
     last_LRU_idx = buffer_get_last_LRU_idx();
     if (last_LRU_idx != -1) {
-        buffers[last_LRU_idx]->next_LRU = buffers[buffer_idx];
+        buffers[last_LRU_idx]->next_LRU = buffer;
         buffer->prev_LRU = buffers[last_LRU_idx];
         buffer->next_LRU = NULL;
     }
