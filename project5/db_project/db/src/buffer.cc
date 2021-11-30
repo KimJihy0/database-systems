@@ -1,6 +1,8 @@
 #include "buffer.h"
 
 buffer_t ** buffers;
+buffer_t * head_LRU;
+buffer_t * tail_LRU;
 int buffer_size;
 pthread_mutex_t buffer_latch;
 
@@ -11,6 +13,8 @@ int init_buffer(int num_buf) {
     for (int i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
+    head_LRU = NULL;
+    tail_LRU = NULL;
     pthread_mutex_init(&buffer_latch, 0);
     return 0;
 }
@@ -54,15 +58,15 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
     pthread_mutex_lock(&buffer_latch);
 
     buffer_t * victim;
-    int i, buffer_idx, last_LRU_idx;
+    int i = -1, buffer_idx, last_LRU_idx;
     buffer_idx = buffer_get_buffer_idx(table_id, page_num);
     if (buffer_idx == -1) {
         for (i = 0; i < buffer_size; i++) {
             if (buffers[i] == NULL) {
                 buffer_idx = i;
                 buffers[buffer_idx] = new buffer_t;
-                buffers[buffer_idx]->next_LRU = NULL;
                 buffers[buffer_idx]->prev_LRU = NULL;
+                buffers[buffer_idx]->next_LRU = NULL;
                 buffers[buffer_idx]->is_dirty = 0;
                 buffers[buffer_idx]->page_latch = PTHREAD_MUTEX_INITIALIZER;
                 pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
@@ -70,7 +74,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
             }
         }
         if (i == buffer_size) {
-            for (victim = buffers[buffer_get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
+            for (victim = head_LRU; victim; victim = victim->next_LRU) {
                 if (pthread_mutex_trylock(&(victim->page_latch)) != EBUSY) break;
             }
             if (victim == NULL) return -1;
@@ -88,21 +92,24 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
     }
     else pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
 
-    if (buffers[buffer_idx]->prev_LRU != NULL)
-        buffers[buffer_idx]->prev_LRU->next_LRU = buffers[buffer_idx]->next_LRU;
-    if (buffers[buffer_idx]->next_LRU != NULL)
-        buffers[buffer_idx]->next_LRU->prev_LRU = buffers[buffer_idx]->prev_LRU;
-    buffers[buffer_idx]->next_LRU = buffers[buffer_idx];
-    buffers[buffer_idx]->prev_LRU = buffers[buffer_idx];
-    last_LRU_idx = buffer_get_last_LRU_idx();
-    if (last_LRU_idx != -1) {
-        buffers[last_LRU_idx]->next_LRU = buffers[buffer_idx];
-        buffers[buffer_idx]->prev_LRU = buffers[last_LRU_idx];
-        buffers[buffer_idx]->next_LRU = NULL;
+    if (i == -1 || i == buffer_size) {
+        if (buffers[buffer_idx]->prev_LRU != NULL)
+            buffers[buffer_idx]->prev_LRU->next_LRU = buffers[buffer_idx]->next_LRU;
+        else head_LRU = buffers[buffer_idx]->next_LRU;
+        if (buffers[buffer_idx]->next_LRU != NULL)
+            buffers[buffer_idx]->next_LRU->prev_LRU = buffers[buffer_idx]->prev_LRU;
+        else tail_LRU = buffers[buffer_idx]->prev_LRU;
+    }
+
+    buffers[buffer_idx]->prev_LRU = tail_LRU;
+    buffers[buffer_idx]->next_LRU = NULL;
+    if (head_LRU != NULL) {
+        tail_LRU->next_LRU = buffers[buffer_idx];
+        tail_LRU = buffers[buffer_idx];
     }
     else {
-        buffers[buffer_idx]->next_LRU = NULL;
-        buffers[buffer_idx]->prev_LRU = NULL;
+        head_LRU = buffers[buffer_idx];
+        tail_LRU = buffers[buffer_idx];
     }
 
     pthread_mutex_unlock(&buffer_latch);
