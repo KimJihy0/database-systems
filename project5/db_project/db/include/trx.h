@@ -1,8 +1,9 @@
 #ifndef DB_TRX_H_
 #define DB_TRX_H_
 
-#include "buffer.h"
 #include <unordered_map>
+
+#include "buffer.h"
 
 #define SHARED      0
 #define EXCLUSIVE   1
@@ -12,8 +13,8 @@
 #define ABORTED     2
 
 #define INIT_BIT(n)     (1UL << (n))
-#define GET_BIT(m,n)    (((m) >> (n)) & 1U)
-#define SET_BIT(m,n)    ({ (m) |= (1UL << (n)); })
+#define GET_BIT(m, n)   (((m) >> (n)) & 1U)
+#define SET_BIT(m, n)   ({ (m) |= (1UL << (n)); })
 
 struct lock_t {
     struct lock_t* prev_lock;
@@ -46,10 +47,8 @@ int trx_begin();
 int trx_commit(int trx_id);
 int trx_abort(int trx_id);
 
-int lock_acquire(int64_t table_id, pagenum_t page_num,
-                 int idx, int trx_id, int lock_mode);
-lock_t* lock_alloc(int64_t table_id, pagenum_t page_num,
-                   int idx, int trx_id, int lock_mode);
+int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);
+lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
 

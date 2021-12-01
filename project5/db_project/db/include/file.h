@@ -1,14 +1,13 @@
 #ifndef DB_FILE_H_
 #define DB_FILE_H_
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <string.h>
-#include <time.h>
+#include <unistd.h>
 
 #define PAGE_SIZE           (4 * 1024)
 #define INITIAL_FILESIZE    (10 * 1024 * 1024)
@@ -46,11 +45,11 @@ struct page_t {
     uint64_t root_num;
     char reserved[88];
     uint64_t free_space;
-    union { 
+    union {
         uint64_t sibling;
         uint64_t left_child;
     };
-    union { 
+    union {
         union {
             slot_t slots[64];
             char values[3968];
@@ -64,11 +63,11 @@ struct table_t {
     int fd;
 };
 
-int64_t file_open_table_file(const char * pathname);
+int64_t file_open_table_file(const char* pathname);
 pagenum_t file_alloc_page(int64_t table_id);
 void file_free_page(int64_t table_id, pagenum_t page_num);
-void file_read_page(int64_t table_id, pagenum_t page_num, page_t * dest);
-void file_write_page(int64_t table_id, pagenum_t page_num, const page_t * src);
+void file_read_page(int64_t table_id, pagenum_t page_num, page_t* dest);
+void file_write_page(int64_t table_id, pagenum_t page_num, const page_t* src);
 void file_close_table_file();
 
 #endif
