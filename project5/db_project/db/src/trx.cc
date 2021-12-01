@@ -109,7 +109,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
         if (trx_table[impl_trx_id] != NULL &&
                 trx_table[impl_trx_id]->trx_state == ACTIVE) {
             if (impl_trx_id == trx_id) {
-                pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+                UNPIN(p_buffer_idx);
                 pthread_mutex_unlock(&trx_latch);
                 pthread_mutex_unlock(&lock_latch);
                 return 0;
@@ -123,7 +123,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
             pthread_mutex_unlock(&lock_latch);
             return 0;
         }
-        pthread_mutex_unlock(&(buffers[p_buffer_idx]->page_latch));
+        UNPIN(p_buffer_idx);
         pthread_mutex_unlock(&trx_latch);
     }
 
@@ -155,7 +155,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
     // lock allocation
     lock_obj = lock_alloc(table_id, page_num, idx, trx_id, lock_mode);
 
-    // deadlock detection
+    // conflict & deadlock detection
     lock_t* cur_obj = lock_entry->head;
     while (cur_obj != lock_obj) {
         if (GET_BIT(cur_obj->bitmap, idx) != 0 &&
@@ -229,20 +229,23 @@ int lock_release(lock_t* lock_obj) {
 /* ---To do---
  * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
  * max_trx_id
- * bpt에서 trx_id 초기화 지우기
- * buffer_get_index()에서 NULL이면 return
- * buffer_request_page()에서 alloc인경우 처리하고 return
- * #define UNPIN(i)
- * shutdown_buffer()에서 is_dirty인 경우만 flush
+ * db_insert(), db_delete() -> trx_id 지우기
+ * malloc(), free() -> new, delete
  * log 뺐는데 맞는지 몰겠음.
+ * double pointer -> pointer
+ * in-memory bpt.cc
+ * O_SYNC
  * 
+ * djb2
  * project4 구조 원상복귀
  * rollback시 value 확인?
  * cmake gdb
  * pathname?????
  * 
  * ---Done---
- * insert, delete 시 slot_index 바뀌는데 무시하는건지.
+ * buffer_get_index()에서 NULL이면 return
+ * shutdown_buffer()에서 is_dirty인 경우만 flush
+ * #define UNPIN(i)
  * detection 주기, 위치
  * memory leak in trx_table
  * lock_entry 구조체 메모리 정렬
@@ -263,7 +266,6 @@ int lock_release(lock_t* lock_obj) {
  * relock시 latch.__data.__lock value 확인.
  * 그냥 최근거를 abort
  * trx_begin()에서 return trx_id가 critical area 밖에 있음
- * hash - djb2?
  * db_find(), db_update()에서 abort.
  * policy 똑바로
  * wake up 위치 안 내려도 되는지.

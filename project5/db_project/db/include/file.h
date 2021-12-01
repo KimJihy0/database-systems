@@ -9,10 +9,12 @@
 #include <errno.h>
 #include <string.h>
 
-#define PAGE_SIZE           (4 * 1024)						// 4KiB
-#define INITIAL_FILESIZE    (10 * 1024 * 1024)				// 10MiB
-#define INITIAL_PAGENUM     (INITIAL_FILESIZE / PAGE_SIZE) 	// 2560
+#define PAGE_SIZE           (4 * 1024)
+#define INITIAL_FILESIZE    (10 * 1024 * 1024)
+#define INITIAL_PAGENUM     (INITIAL_FILESIZE / PAGE_SIZE)
 #define NUM_BUCKETS         31
+
+#define ERR_SYS(s) ({ perror((s)); exit(1); })
 
 typedef uint64_t pagenum_t;
 

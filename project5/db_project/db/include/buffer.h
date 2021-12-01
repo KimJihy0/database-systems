@@ -4,14 +4,16 @@
 #include "file.h"
 #include <pthread.h>
 
+#define UNPIN(i) ({ pthread_mutex_unlock(&(buffers[(i)]->page_latch)); })
+
 struct buffer_t {
     page_t frame;
     int64_t table_id;
     pagenum_t page_num;
     uint16_t is_dirty;
     pthread_mutex_t page_latch;
-    buffer_t * next_LRU;
     buffer_t * prev_LRU;
+    buffer_t * next_LRU;
 };
 
 extern buffer_t ** buffers;
