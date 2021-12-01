@@ -1,8 +1,9 @@
 #include "buffer.h"
 
-buffer_t **buffers;
+buffer_t ** buffers;
 int buffer_size;
 pthread_mutex_t buffer_latch;
+double clocks[10];
 
 int init_buffer(int num_buf) {
     buffer_size = num_buf;
@@ -71,11 +72,9 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         buffers[buffer_idx]->table_id = table_id;
         buffers[buffer_idx]->page_num = page_num;
         file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
-    } else {
+    }
+    else {
         if (buffers[buffer_idx] == NULL) {
-            int last_LRU_idx = buffer_get_first_LRU_idx();
-            buffer_t* last_LRU = (last_LRU_idx != -1) ? buffers[last_LRU_idx] : NULL;
-
             buffers[buffer_idx] = new buffer_t;
             buffers[buffer_idx]->is_dirty = 0;
             buffers[buffer_idx]->page_latch = PTHREAD_MUTEX_INITIALIZER;
@@ -84,58 +83,10 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
             buffers[buffer_idx]->table_id = table_id;
             buffers[buffer_idx]->page_num = page_num;
             file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
-
-            if (last_LRU != NULL) last_LRU->next_LRU = buffers[buffer_idx];
         }
         pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
     }
 
-    pthread_mutex_unlock(&buffer_latch);
-    return buffer_idx;
-}
-
-pagenum_t buffer_alloc_page(int64_t table_id) {
-    pagenum_t page_num;
-    page_t *header, *alloc;
-    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
-    if (header->next_frpg == 0) {
-        if (buffers[header_buffer_idx]->is_dirty)
-            file_write_page(table_id, 0, header);
-        buffers[header_buffer_idx]->is_dirty = 0;
-        page_num = file_alloc_page(table_id);
-        file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
-        buffer_write_page(table_id, 0, &header, 0);
-        return page_num;
-    }
-    page_num = header->next_frpg;
-    int alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
-    header->next_frpg = alloc->next_frpg;
-    buffer_write_page(table_id, page_num, &alloc, 0);
-    buffer_write_page(table_id, 0, &header);
-    return page_num;
-}
-
-void buffer_free_page(int64_t table_id, pagenum_t page_num) {
-    page_t *header, *free;
-    buffer_read_page(table_id, 0, &header);
-    buffer_read_page(table_id, page_num, &free);
-    free->next_frpg = header->next_frpg;
-    header->next_frpg = page_num;
-    buffer_write_page(table_id, 0, &header);
-    buffer_write_page(table_id, page_num, &free);
-}
-
-int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t **dest) {
-    int buffer_idx = buffer_request_page(table_id, page_num);
-    *dest = &(buffers[buffer_idx]->frame);
-    return buffer_idx;
-}
-
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t *const *src, int dirty) {
-    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
-    if (dirty) buffers[buffer_idx]->is_dirty = 1;
-    
-    pthread_mutex_lock(&buffer_latch);
     if (buffers[buffer_idx]->prev_LRU != NULL)
         buffers[buffer_idx]->prev_LRU->next_LRU = buffers[buffer_idx]->next_LRU;
     if (buffers[buffer_idx]->next_LRU != NULL)
@@ -147,11 +98,55 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t *const *src,
         buffers[last_LRU_idx]->next_LRU = buffers[buffer_idx];
         buffers[buffer_idx]->prev_LRU = buffers[last_LRU_idx];
         buffers[buffer_idx]->next_LRU = NULL;
-    } else {
+    }
+    else {
         buffers[buffer_idx]->next_LRU = NULL;
         buffers[buffer_idx]->prev_LRU = NULL;
     }
-    pthread_mutex_unlock(&buffer_latch);
 
+    pthread_mutex_unlock(&buffer_latch);
+    return buffer_idx;
+}
+
+pagenum_t buffer_alloc_page(int64_t table_id) {
+    pagenum_t page_num;
+    page_t * header, * alloc;
+    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    if (header->next_frpg == 0) {
+        if (buffers[header_buffer_idx]->is_dirty)
+            file_write_page(table_id, 0, header);
+        buffers[header_buffer_idx]->is_dirty = 0;
+        page_num = file_alloc_page(table_id);
+        file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
+        buffer_write_page(table_id, 0, &header, 0);
+        return page_num;
+    }
+    page_num = header->next_frpg;
+    buffer_read_page(table_id, page_num, &alloc);
+    header->next_frpg = alloc->next_frpg;
+    buffer_write_page(table_id, page_num, &alloc, 0);
+    buffer_write_page(table_id, 0, &header);
+    return page_num;
+}
+
+void buffer_free_page(int64_t table_id, pagenum_t page_num) {
+    page_t * header, * free;
+    buffer_read_page(table_id, 0, &header);
+    buffer_read_page(table_id, page_num, &free);
+    free->next_frpg = header->next_frpg;
+    header->next_frpg = page_num;
+    buffer_write_page(table_id, 0, &header);
+    buffer_write_page(table_id, page_num, &free);
+}
+
+int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t ** dest) {
+    int buffer_idx = buffer_request_page(table_id, page_num);
+    *dest = &(buffers[buffer_idx]->frame);
+    return buffer_idx;
+}
+
+void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t * const * src, int dirty) {
+    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
+    if (dirty) buffers[buffer_idx]->is_dirty = 1;
     pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
 }

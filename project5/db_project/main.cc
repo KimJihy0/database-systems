@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define NUM_KEYS    (10000)
-#define NUM_BUFS    (400)
+#define NUM_BUFS    (200)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
