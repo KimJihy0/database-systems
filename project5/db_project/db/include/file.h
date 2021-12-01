@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #define PAGE_SIZE           (4 * 1024)
 #define INITIAL_FILESIZE    (10 * 1024 * 1024)

@@ -12,8 +12,8 @@
 #define ABORTED     2
 
 #define INIT_BIT(n)     (1UL << (n))
-#define GET_BIT(num,n)  (((num) >> (n)) & 1U)
-#define SET_BIT(num,n)  ({ (num) |= (1UL << (n)); })
+#define GET_BIT(m,n)    (((m) >> (n)) & 1U)
+#define SET_BIT(m,n)    ({ (m) |= (1UL << (n)); })
 
 struct lock_t {
     struct lock_t* prev_lock;

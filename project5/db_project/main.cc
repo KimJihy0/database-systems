@@ -6,7 +6,7 @@
 #include <time.h>
 
 #define NUM_KEYS    (10000)
-#define NUM_BUFS    (100)
+#define NUM_BUFS    (400)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
@@ -315,6 +315,11 @@ int main() {
     trx_commit(trx_id);
 
     printf("\n[TEST END]\n\n");    
+
+    // printf("%fsec\n", clocks[0] / CLOCKS_PER_SEC);
+    // printf("try_count : %d\n", try_count);
+    // printf("write_count : %d\n", write_count);
+    // printf("read_count : %d\n", read_count);
 
 	func_exit:
 	printf("[SHUTDOWN START]\n");

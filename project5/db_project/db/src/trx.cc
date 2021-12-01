@@ -109,7 +109,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
         if (trx_table[impl_trx_id] != NULL &&
                 trx_table[impl_trx_id]->trx_state == ACTIVE) {
             if (impl_trx_id == trx_id) {
-                UNPIN(p_buffer_idx);
+                buffer_write_page(table_id, page_num, &p, 0);
                 pthread_mutex_unlock(&trx_latch);
                 pthread_mutex_unlock(&lock_latch);
                 return 0;
@@ -123,7 +123,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num,
             pthread_mutex_unlock(&lock_latch);
             return 0;
         }
-        UNPIN(p_buffer_idx);
+        buffer_write_page(table_id, page_num, &p, 0);
         pthread_mutex_unlock(&trx_latch);
     }
 
@@ -232,9 +232,8 @@ int lock_release(lock_t* lock_obj) {
  * db_insert(), db_delete() -> trx_id 지우기
  * malloc(), free() -> new, delete
  * log 뺐는데 맞는지 몰겠음.
- * double pointer -> pointer
- * in-memory bpt.cc
  * O_SYNC
+ * db_insert() 중복검사 지우기
  * 
  * djb2
  * project4 구조 원상복귀
