@@ -6,8 +6,7 @@ pthread_mutex_t buffer_latch;
 
 int init_buffer(int num_buf) {
     buffer_size = num_buf;
-    buffers = (buffer_t**)malloc(buffer_size * sizeof(buffer_t*));
-    if (buffers == NULL) return -1;
+    buffers = new buffer_t*[buffer_size];
     for (int i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
@@ -26,7 +25,7 @@ int shutdown_buffer() {
             delete buffers[i];
         }
     }
-    free(buffers);
+    delete[] buffers;
     pthread_mutex_destroy(&buffer_latch);
     return 0;
 }

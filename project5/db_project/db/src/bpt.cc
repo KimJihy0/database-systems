@@ -27,7 +27,7 @@ int db_find(int64_t table_id, int64_t key,
     page_t* p;
     int i;
 
-    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
+    if (trx_id != 0 && trx_table[trx_id] == NULL) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -60,7 +60,7 @@ int db_update(int64_t table_id, int64_t key,
     page_t* p;
     int i;
 
-    if (trx_id != 0 && trx_table[trx_id]->trx_state == ABORTED) return trx_id;
+    if (trx_id != 0 && trx_table[trx_id] == NULL) return trx_id;
 
     p_pgnum = find_leaf(table_id, key);
     if (p_pgnum == 0) return -1;
@@ -159,12 +159,10 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
         leaf->slots[i].key = leaf->slots[i - 1].key;
         leaf->slots[i].size = leaf->slots[i - 1].size;
         leaf->slots[i].offset = leaf->slots[i - 1].offset;
-        leaf->slots[i].trx_id = leaf->slots[i - 1].trx_id;
     }
     leaf->slots[insertion_index].key = key;
     leaf->slots[insertion_index].size = val_size;
     leaf->slots[insertion_index].offset = offset - val_size + HEADER_SIZE;
-    leaf->slots[insertion_index].trx_id = 0;
     memcpy(leaf->values + offset - val_size, value, val_size);
 
     leaf->num_keys++;
@@ -193,12 +191,10 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         temp_slots[j].key = leaf->slots[i].key;
         temp_slots[j].size = leaf->slots[i].size;
         temp_slots[j].offset = leaf->slots[i].offset;
-        temp_slots[j].trx_id = leaf->slots[i].trx_id;
     }
     temp_slots[insertion_index].key = key;
     temp_slots[insertion_index].size = val_size;
     temp_slots[insertion_index].offset = offset - val_size + HEADER_SIZE;
-    temp_slots[insertion_index].trx_id = 0;
     memcpy(temp_values + offset, leaf->values + offset, FREE_SPACE - offset);
     memcpy(temp_values + offset - val_size, value, val_size);
 
@@ -222,7 +218,6 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         leaf->slots[i].key = temp_slots[i].key;
         leaf->slots[i].size = temp_slots[i].size;
         leaf->slots[i].offset = offset + HEADER_SIZE;
-        leaf->slots[i].trx_id = temp_slots[i].trx_id;
         memcpy(leaf->values + offset,
                temp_values + temp_slots[i].offset - HEADER_SIZE, temp_slots[i].size);
         leaf->num_keys++;
@@ -235,7 +230,6 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         new_leaf->slots[j].key = temp_slots[i].key;
         new_leaf->slots[j].size = temp_slots[i].size;
         new_leaf->slots[j].offset = offset + HEADER_SIZE;
-        new_leaf->slots[j].trx_id = temp_slots[i].trx_id;
         memcpy(new_leaf->values + offset,
                temp_values + temp_slots[i].offset - HEADER_SIZE, temp_slots[i].size);
         new_leaf->num_keys++;
@@ -368,7 +362,6 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     root->slots[0].key = key;
     root->slots[0].size = val_size;
     root->slots[0].offset = PAGE_SIZE - val_size;
-    root->slots[0].trx_id = 0;
     memcpy(root->values + FREE_SPACE - val_size, value, val_size);
     root->free_space -= (SLOT_SIZE + val_size);
     root->parent = 0;
@@ -518,7 +511,6 @@ void delete_from_leaf(int64_t table_id, pagenum_t leaf_pgnum, int64_t key) {
         leaf->slots[i - 1].key = leaf->slots[i].key;
         leaf->slots[i - 1].size = leaf->slots[i].size;
         leaf->slots[i - 1].offset = leaf->slots[i].offset;
-        leaf->slots[i - 1].trx_id = leaf->slots[i].trx_id;
     }
     memmove(leaf->values + insertion_offset + val_size,
             leaf->values + insertion_offset,
@@ -559,7 +551,6 @@ void merge_leaves(int64_t table_id, pagenum_t leaf_pgnum,
         sibling->slots[j].key = leaf->slots[i].key;
         sibling->slots[j].size = leaf->slots[i].size;
         sibling->slots[j].offset = leaf->slots[i].offset - sibling_size;
-        sibling->slots[j].trx_id = leaf->slots[i].trx_id;
         sibling->num_keys++;
         sibling->free_space -= (leaf->slots[i].size + SLOT_SIZE);
     }
@@ -598,13 +589,11 @@ void redistribute_leaves(int64_t table_id, pagenum_t leaf_pgnum,
                 leaf->slots[i].key = leaf->slots[i - 1].key;
                 leaf->slots[i].size = leaf->slots[i - 1].size;
                 leaf->slots[i].offset = leaf->slots[i - 1].offset;
-                leaf->slots[i].trx_id = leaf->slots[i - 1].trx_id;
             }
         }
         leaf->slots[dest_index].key = sibling->slots[src_index].key;
         leaf->slots[dest_index].size = sibling->slots[src_index].size;
         leaf->slots[dest_index].offset = dest_offset + HEADER_SIZE;
-        leaf->slots[dest_index].trx_id = sibling->slots[src_index].trx_id;
         memcpy(leaf->values + dest_offset,
                sibling->values + sibling->slots[src_index].offset - HEADER_SIZE,
                src_size);

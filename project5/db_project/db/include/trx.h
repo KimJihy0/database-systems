@@ -8,10 +8,6 @@
 #define SHARED      0
 #define EXCLUSIVE   1
 
-#define ACTIVE      0
-#define COMMITTED   1
-#define ABORTED     2
-
 #define INIT_BIT(n)     (1UL << (n))
 #define GET_BIT(m, n)   (((m) >> (n)) & 1U)
 #define SET_BIT(m, n)   ({ (m) |= (1UL << (n)); })
@@ -35,7 +31,6 @@ struct lock_entry_t {
 struct trx_entry_t {
     struct lock_t* head;
     int waits_for_trx_id;
-    int trx_state;
 };
 
 extern std::unordered_map<int, trx_entry_t*> trx_table;

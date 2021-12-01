@@ -35,14 +35,12 @@ int trx_begin() {
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
-    trx_table[trx_id]->trx_state = ACTIVE;
     pthread_mutex_unlock(&trx_latch);
     return local_trx_id;
 }
 
 int trx_commit(int trx_id) {
-    if (trx_table[trx_id]->trx_state == ABORTED)
-        return 0;
+    if (trx_table[trx_id] == NULL) return 0;
     pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
@@ -53,18 +51,15 @@ int trx_commit(int trx_id) {
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
     }
-
-    trx_table[trx_id]->head = NULL;
-    trx_table[trx_id]->waits_for_trx_id = 0;
-    trx_table[trx_id]->trx_state = COMMITTED;
+    delete trx_table[trx_id];
+    trx_table[trx_id] = NULL;
 
     pthread_mutex_unlock(&lock_latch);
     return trx_id;
 }
 
 int trx_abort(int trx_id) {
-    if (trx_table[trx_id]->trx_state == ABORTED)
-        return 0;
+    if (trx_table[trx_id] == NULL) return 0;
     pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
@@ -75,10 +70,8 @@ int trx_abort(int trx_id) {
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
     }
-
-    trx_table[trx_id]->head = NULL;
-    trx_table[trx_id]->waits_for_trx_id = 0;
-    trx_table[trx_id]->trx_state = ABORTED;
+    delete trx_table[trx_id];
+    trx_table[trx_id] = NULL;
 
     pthread_mutex_unlock(&lock_latch);
     return trx_id;
@@ -113,8 +106,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
         int p_buffer_idx = buffer_read_page(table_id, page_num, &p);
         pthread_mutex_lock(&trx_latch);
         int impl_trx_id = p->slots[idx].trx_id;
-        if (trx_table[impl_trx_id] != NULL &&
-            trx_table[impl_trx_id]->trx_state == ACTIVE) {
+        if (trx_table[impl_trx_id] != NULL) {
             if (impl_trx_id == trx_id) {
                 UNPIN(p_buffer_idx);
                 pthread_mutex_unlock(&trx_latch);
@@ -212,7 +204,7 @@ int detect_deadlock(int trx_id) {
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
-    } while (trx_id != 0 && !visit[trx_id]);
+    } while (trx_table[trx_id] != NULL && !visit[trx_id]);
     return trx_id;
 }
 
@@ -234,14 +226,8 @@ int lock_release(lock_t* lock_obj) {
 }
 
 /* ---To do---
- * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
  * max_trx_id
- * db_insert(), db_delete() -> trx_id 지우기
- * malloc(), free() -> new, delete
  * log 뺐는데 맞는지 몰겠음.
- * double pointer -> pointer
- * in-memory bpt.cc
- * O_SYNC
  *
  * djb2
  * project4 구조 원상복귀
@@ -250,6 +236,9 @@ int lock_release(lock_t* lock_obj) {
  * pathname?????
  *
  * ---Done---
+ * malloc(), free() -> new, delete
+ * db_insert(), db_delete() -> trx_id 지우기
+ * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
  * buffer_get_index()에서 NULL이면 return
  * shutdown_buffer()에서 is_dirty인 경우만 flush
  * #define UNPIN(i)
