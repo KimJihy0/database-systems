@@ -1,13 +1,7 @@
 #ifndef DB_FILE_H_
 #define DB_FILE_H_
 
-#include <errno.h>
-#include <fcntl.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 #define PAGE_SIZE           (4 * 1024)
 #define INITIAL_FILESIZE    (10 * 1024 * 1024)

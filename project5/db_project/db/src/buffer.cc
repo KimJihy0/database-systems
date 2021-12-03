@@ -1,5 +1,7 @@
 #include "buffer.h"
 
+#include <errno.h>
+
 buffer_t** buffers;
 int buffer_size;
 pthread_mutex_t buffer_latch;
@@ -10,23 +12,20 @@ int init_buffer(int num_buf) {
     for (int i = 0; i < buffer_size; i++) {
         buffers[i] = NULL;
     }
-    pthread_mutex_init(&buffer_latch, 0);
+    if (pthread_mutex_init(&buffer_latch, 0) != 0)
+        return -1;
     return 0;
 }
 
 int shutdown_buffer() {
     for (int i = 0; i < buffer_size; i++) {
-        if (buffers[i] != NULL) {
-            if (buffers[i]->is_dirty != 0) {
-                file_write_page(buffers[i]->table_id,
-                                buffers[i]->page_num,
-                                &(buffers[i]->frame));
-            }
-            delete buffers[i];
-        }
+        if (buffers[i] != NULL && buffers[i]->is_dirty != 0)
+            file_write_page(buffers[i]->table_id, buffers[i]->page_num, &(buffers[i]->frame));
+        delete buffers[i];
     }
     delete[] buffers;
-    pthread_mutex_destroy(&buffer_latch);
+    if (pthread_mutex_destroy(&buffer_latch) != 0)
+        return -1;
     return 0;
 }
 
@@ -107,21 +106,19 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
 pagenum_t buffer_alloc_page(int64_t table_id) {
     pagenum_t page_num;
     page_t *header, *alloc;
-    int header_buffer_idx = buffer_read_page(table_id, 0, &header);
+    buffer_read_page(table_id, 0, &header);
     if (header->next_frpg == 0) {
-        if (buffers[header_buffer_idx]->is_dirty)
-            file_write_page(table_id, 0, header);
-        buffers[header_buffer_idx]->is_dirty = 0;
+        file_write_page(table_id, 0, header);
         page_num = file_alloc_page(table_id);
-        file_read_page(table_id, 0, &(buffers[header_buffer_idx]->frame));
-        UNPIN(header_buffer_idx);
+        buffer_read_page(table_id, 0, &header);
+        buffer_unpin_page(table_id, 0);
         return page_num;
     }
     page_num = header->next_frpg;
-    int alloc_buffer_idx = buffer_read_page(table_id, page_num, &alloc);
+    buffer_read_page(table_id, page_num, &alloc);
     header->next_frpg = alloc->next_frpg;
-    UNPIN(alloc_buffer_idx);
-    buffer_write_page(table_id, 0, &header);
+    buffer_unpin_page(table_id, page_num);
+    buffer_write_page(table_id, 0);
     return page_num;
 }
 
@@ -131,18 +128,22 @@ void buffer_free_page(int64_t table_id, pagenum_t page_num) {
     buffer_read_page(table_id, page_num, &free);
     free->next_frpg = header->next_frpg;
     header->next_frpg = page_num;
-    buffer_write_page(table_id, 0, &header);
-    buffer_write_page(table_id, page_num, &free);
+    buffer_write_page(table_id, 0);
+    buffer_write_page(table_id, page_num);
 }
 
-int buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest) {
+void buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest) {
     int buffer_idx = buffer_request_page(table_id, page_num);
     *dest = &(buffers[buffer_idx]->frame);
-    return buffer_idx;
 }
 
-void buffer_write_page(int64_t table_id, pagenum_t page_num, page_t* const* src) {
+void buffer_write_page(int64_t table_id, pagenum_t page_num) {
     int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
     buffers[buffer_idx]->is_dirty = 1;
-    UNPIN(buffer_idx);
+    pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
+}
+
+void buffer_unpin_page(int64_t table_id, pagenum_t page_num) {
+    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
+    pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
 }

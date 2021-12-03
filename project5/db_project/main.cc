@@ -1,5 +1,6 @@
 #include "bpt.h"
 
+#include <string.h>
 #include <random>
 #include <algorithm>
 #include <vector>
@@ -10,11 +11,11 @@
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (8)
+#define UPDATE_THREADS_NUMBER   (5)
 #define SEARCH_THREADS_NUMBER   (1)
 
-#define UPDATE_COUNT            (10000)
-#define SEARCH_COUNT            (10000)
+#define UPDATE_COUNT            (100)
+#define SEARCH_COUNT            (100)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname);
@@ -31,7 +32,6 @@ void* update_thread_func(void* arg) {
     for (int i = 0; i < UPDATE_COUNT; i++)
         keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
-        // keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -53,7 +53,6 @@ void* search_thread_func(void* arg) {
     for (int i = 0; i < SEARCH_COUNT; i++)
         keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
-        // keys[i] = (rand() % 2) * 26 + (rand() % 2);
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -66,7 +65,7 @@ void* search_thread_func(void* arg) {
     return nullptr;
 }
 
-#if 1
+#if 0
 int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
@@ -76,15 +75,6 @@ int main() {
     init_db(NUM_BUFS);
     int64_t table_id = create_db("table0");
     printf("file creation complete(%ld).\n", table_id);
-
-    // char ret_val[108];
-    // uint16_t old_size;
-    // int trx_id = trx_begin();
-    // for (int i = 0; i < 50; i++)
-    //     // db_find(table_id, i, ret_val, &old_size, trx_id);
-    //     db_update(table_id, i, (char*)"??", 2, &old_size, trx_id);
-    // trx_commit(trx_id);
-    // return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
@@ -96,7 +86,6 @@ int main() {
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_join(search_threads[i], NULL);
 
-    // print_all(table_id);
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
     return 0;
@@ -190,45 +179,45 @@ void print_page(pagenum_t page_num, page_t page) {
 
 void print_pgnum(int64_t table_id, pagenum_t page_num) {
 	page_t* page;
-	int idx = buffer_read_page(table_id, page_num, &page);
+	buffer_read_page(table_id, page_num, &page);
 	print_page(page_num, *page);
-    pthread_mutex_unlock(&(buffers[idx]->page_latch));
+    buffer_unpin_page(table_id, page_num);
 }
 
-void print_all(int64_t table_id) {
-    pagenum_t root_num, temp_num;
-    page_t* root, * page, * header;
+// void print_all(int64_t table_id) {
+//     pagenum_t root_num, temp_num;
+//     page_t* root, * page, * header;
 
-    int header_idx = buffer_read_page(table_id, 0, &header);
-    root_num = header->root_num;
-    pthread_mutex_unlock(&(buffers[header_idx]->page_latch));
+//     buffer_read_page(table_id, 0, &header);
+//     root_num = header->root_num;
+//     buffer_unpin_page(table_id, 0);
 
-	printf("-----header information-----\n");
-	printf("root_num: %ld\n", root_num);
-	printf("\n");
-	if (!root_num) return;
+// 	printf("-----header information-----\n");
+// 	printf("root_num: %ld\n", root_num);
+// 	printf("\n");
+// 	if (!root_num) return;
 
-    int root_idx = buffer_read_page(table_id, root_num, &root);
-    print_page(root_num, *root);
-    if (root->is_leaf) {
-        pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
-        return;
-    }
+//     buffer_read_page(table_id, root_num, &root);
+//     print_page(root_num, *root);
+//     if (root->is_leaf) {
+//         buffer_unpin_page(table_id, root_num);
+//         return;
+//     }
 
-    temp_num = root->left_child;
-    int temp_idx = buffer_read_page(table_id, temp_num, &page);
-    print_page(temp_num, *page); 
-    for (int i = 0; i < root->num_keys; i++) {
-        temp_num = root->entries[i].child;
-        pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
-        temp_idx = buffer_read_page(table_id, temp_num, &page);
-        print_page(temp_num, *page);
-    }
-    pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
-    pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
-}
+//     temp_num = root->left_child;
+//     int temp_idx = buffer_read_page(table_id, temp_num, &page);
+//     print_page(temp_num, *page); 
+//     for (int i = 0; i < root->num_keys; i++) {
+//         temp_num = root->entries[i].child;
+//         pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
+//         temp_idx = buffer_read_page(table_id, temp_num, &page);
+//         print_page(temp_num, *page);
+//     }
+//     pthread_mutex_unlock(&(buffers[root_idx]->page_latch));
+//     pthread_mutex_unlock(&(buffers[temp_idx]->page_latch));
+// }
 
-#if 0
+#if 1
 int main() {
     std::random_device rd;
 	std::mt19937 gen(rd());

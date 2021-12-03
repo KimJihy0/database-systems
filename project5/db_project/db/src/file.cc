@@ -1,5 +1,12 @@
 #include "file.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 table_t tables[NUM_BUCKETS];
 
 int64_t file_open_table_file(const char* pathname) {
@@ -8,9 +15,9 @@ int64_t file_open_table_file(const char* pathname) {
         fd = open(pathname, O_RDWR);
         if (fd < 0)
             ERR_SYS("Failure to open table file(open error)");
-    } else if (fd < 0)
+    } else if (fd < 0) {
         ERR_SYS("Failure to open table file(creat error)");
-    else {
+    } else {
         page_t header;
         header.next_frpg = INITIAL_PAGENUM - 1;
         header.num_pages = INITIAL_PAGENUM;
@@ -25,8 +32,8 @@ int64_t file_open_table_file(const char* pathname) {
             p.next_frpg = i - 1;
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to open table file(write error)");
+            fsync(fd);
         }
-        fsync(fd);
     }
 
     table_t new_table;
@@ -70,8 +77,8 @@ pagenum_t file_alloc_page(int64_t table_id) {
             p.next_frpg = i - 1;
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to alloc page(write error)");
+            fsync(fd);
         }
-        fsync(fd);
 
         header.next_frpg = i - 1;
         header.num_pages = i;

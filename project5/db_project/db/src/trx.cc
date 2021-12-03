@@ -1,15 +1,16 @@
 #include "trx.h"
 
+#include <unordered_map>
+#include <string.h>
+
 pthread_mutex_t lock_latch;
 pthread_mutex_t trx_latch;
 struct pair_hash {
     std::size_t operator()(const std::pair<int64_t, pagenum_t>& pair) const {
-        return std::hash<int64_t>()(pair.first) ^
-               std::hash<pagenum_t>()(pair.second);
+        return std::hash<int64_t>()(pair.first) ^ std::hash<pagenum_t>()(pair.second);
     }
 };
-std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash>
-    lock_table;
+std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash> lock_table;
 std::unordered_map<int, trx_entry_t*> trx_table;
 static int trx_id;
 
@@ -40,7 +41,7 @@ int trx_begin() {
 }
 
 int trx_commit(int trx_id) {
-    if (trx_table[trx_id] == NULL) return 0;
+    if (!is_active(trx_id)) return 0;
     pthread_mutex_lock(&lock_latch);
 
     lock_t* del_obj;
@@ -59,8 +60,18 @@ int trx_commit(int trx_id) {
 }
 
 int trx_abort(int trx_id) {
-    if (trx_table[trx_id] == NULL) return 0;
+    if (!is_active(trx_id)) return 0;
     pthread_mutex_lock(&lock_latch);
+
+    page_t* p;
+    log_t* log;
+    while (!(trx_table[trx_id]->logs.empty())) {
+        log = &(trx_table[trx_id]->logs.top());
+        buffer_read_page(log->table_id, log->page_num, &p);
+        memcpy(p->values + log->offset, log->old_value, log->size);
+        buffer_write_page(log->table_id, log->page_num);
+        trx_table[trx_id]->logs.pop();
+    }
 
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
@@ -75,6 +86,14 @@ int trx_abort(int trx_id) {
 
     pthread_mutex_unlock(&lock_latch);
     return trx_id;
+}
+
+int is_active(int trx_id) {
+    return trx_table[trx_id] != NULL;
+}
+
+void push_log(int trx_id, log_t* log) {
+    trx_table[trx_id]->logs.push(*log);
 }
 
 int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode) {
@@ -103,12 +122,12 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     }
     if (lock_obj == NULL) {
         page_t* p;
-        int p_buffer_idx = buffer_read_page(table_id, page_num, &p);
+        buffer_read_page(table_id, page_num, &p);
         pthread_mutex_lock(&trx_latch);
         int impl_trx_id = p->slots[idx].trx_id;
-        if (trx_table[impl_trx_id] != NULL) {
+        if (is_active(impl_trx_id)) {
             if (impl_trx_id == trx_id) {
-                UNPIN(p_buffer_idx);
+                buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&trx_latch);
                 pthread_mutex_unlock(&lock_latch);
                 return 0;
@@ -116,12 +135,12 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             lock_alloc(table_id, page_num, idx, impl_trx_id, EXCLUSIVE);
         } else if (lock_mode == EXCLUSIVE) {
             p->slots[idx].trx_id = trx_id;
-            buffer_write_page(table_id, page_num, &p);
+            buffer_write_page(table_id, page_num);
             pthread_mutex_unlock(&trx_latch);
             pthread_mutex_unlock(&lock_latch);
             return 0;
         }
-        UNPIN(p_buffer_idx);
+        buffer_unpin_page(table_id, page_num);
         pthread_mutex_unlock(&trx_latch);
     }
 
@@ -204,7 +223,7 @@ int detect_deadlock(int trx_id) {
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
-    } while (trx_table[trx_id] != NULL && !visit[trx_id]);
+    } while (is_active(trx_id) && !visit[trx_id]);
     return trx_id;
 }
 
@@ -224,48 +243,3 @@ int lock_release(lock_t* lock_obj) {
 
     return 0;
 }
-
-/* ---To do---
- * max_trx_id
- * log 뺐는데 맞는지 몰겠음.
- *
- * djb2
- * project4 구조 원상복귀
- * rollback시 value 확인?
- * cmake gdb
- * pathname?????
- *
- * ---Done---
- * malloc(), free() -> new, delete
- * db_insert(), db_delete() -> trx_id 지우기
- * trx_table에서 delete (abort, commit) (nullify, delete, and erase(clear?))
- * buffer_get_index()에서 NULL이면 return
- * shutdown_buffer()에서 is_dirty인 경우만 flush
- * #define UNPIN(i)
- * detection 주기, 위치
- * memory leak in trx_table
- * lock_entry 구조체 메모리 정렬
- * lock_acquire() 1,2번째 while문 확인. (lock_bitmap? wait_bitmap?)
- * while() { pthread_cond_wait } ?
- * log latch
- * lock_acquire()에서 deadlock detection해도 되는지. NULL return 가능한지.
- * ACTIVE, COMMITTED, ABORTED : 0,1,2 or 1,2,3
- * log->key(X) log->offset(O)
- * trx 관련 trx_latch
- * trx_abort()가 index manager에 있어서 찝찝한 상태.
- * upgradable lock(U_lock)
- * undo할 때 lock?
- * logging 필요? 필요하다면 꼭 파일에 해야 하는지
- * waits_for_trx_id : 1개인지.
- * NUM_BUFS 1일 때 에러나야 함.
- * if (p_buffer_idx != -1) 일단 지워놨음.
- * relock시 latch.__data.__lock value 확인.
- * 그냥 최근거를 abort
- * trx_begin()에서 return trx_id가 critical area 밖에 있음
- * db_find(), db_update()에서 abort.
- * policy 똑바로
- * wake up 위치 안 내려도 되는지.
- * record_id == key?
- * trx_entry_t 없애고 simple linked-list로 수정
- * head, tail -> dummy node 가능?
- */

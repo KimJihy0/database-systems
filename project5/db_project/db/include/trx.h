@@ -1,7 +1,7 @@
 #ifndef DB_TRX_H_
 #define DB_TRX_H_
 
-#include <unordered_map>
+#include <stack>
 
 #include "buffer.h"
 
@@ -23,6 +23,17 @@ struct lock_t {
     uint64_t bitmap;
 };
 
+struct log_t {
+    log_t(int64_t table_id, pagenum_t page_num, uint16_t offset, uint16_t size) :
+        table_id(table_id), page_num(page_num), offset(offset), size(size) {}
+    int64_t table_id;
+    pagenum_t page_num;
+    uint16_t offset;
+    uint16_t size;
+    char old_value[108];
+    char new_value[108];
+};
+
 struct lock_entry_t {
     struct lock_t* head;
     struct lock_t* tail;
@@ -31,9 +42,8 @@ struct lock_entry_t {
 struct trx_entry_t {
     struct lock_t* head;
     int waits_for_trx_id;
+    std::stack<log_t> logs;
 };
-
-extern std::unordered_map<int, trx_entry_t*> trx_table;
 
 int init_lock_table();
 int shutdown_lock_table();
@@ -41,6 +51,8 @@ int shutdown_lock_table();
 int trx_begin();
 int trx_commit(int trx_id);
 int trx_abort(int trx_id);
+int is_active(int trx_id);
+void push_log(int trx_id, log_t* log);
 
 int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);
 lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);

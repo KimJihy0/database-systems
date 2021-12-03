@@ -3,13 +3,11 @@
 
 #include "trx.h"
 
-#define HEADER_SIZE 128
-#define FREE_SPACE 3968
-#define SLOT_SIZE 16
-#define ENTRY_ORDER 249
-#define THRESHOLD 2500
-
-// DBMS
+#define HEADER_SIZE     128
+#define FREE_SPACE      3968
+#define SLOT_SIZE       16
+#define ENTRY_ORDER     249
+#define THRESHOLD       2500
 
 int init_db(int num_buf);
 int shutdown_db();
