@@ -32,8 +32,8 @@ int64_t file_open_table_file(const char* pathname) {
             p.next_frpg = i - 1;
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to open table file(write error)");
-            fsync(fd);
         }
+        fsync(fd);
     }
 
     table_t new_table;
@@ -77,8 +77,8 @@ pagenum_t file_alloc_page(int64_t table_id) {
             p.next_frpg = i - 1;
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to alloc page(write error)");
-            fsync(fd);
         }
+        fsync(fd);
 
         header.next_frpg = i - 1;
         header.num_pages = i;
