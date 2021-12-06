@@ -6,8 +6,8 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (10000)
-#define NUM_BUFS    (200)
+#define NUM_KEYS    (2500000)
+#define NUM_BUFS    (1000000)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
@@ -30,13 +30,13 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-        // keys[i] = i;
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
         db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
-    if (trx_commit(trx_id) == trx_id)
+    if (trx_abort(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
         printf("Update thread is done(abort).(%s)\n", (char*)value.c_str());
@@ -51,8 +51,8 @@ void* search_thread_func(void* arg) {
     int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-        // keys[i] = i;
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -73,7 +73,7 @@ int main() {
     srand(time(__null));
 
     init_db(NUM_BUFS);
-    int64_t table_id = create_db("table0");
+    int64_t table_id = create_db("table1");
     printf("file creation complete(%ld).\n", table_id);
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
@@ -85,6 +85,9 @@ int main() {
         pthread_join(update_threads[i], NULL);
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
         pthread_join(search_threads[i], NULL);
+
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
@@ -251,21 +254,6 @@ int main() {
         }
         printf("\t[INSERT END]\n");
 
-        // for (int i = 0; i < 100000; i++)
-        //     db_find(table_id, rand() % NUM_KEYS, value, &val_size, trx_id);
-        
-        // for (int i = 0; i < 3; i++)
-        //     printf("%d : %fsec\n", i, clocks[i] / CLOCKS_PER_SEC);
-
-        // for (int j = 0; j < 10; j++)
-        //     for (int i = 0; i < 10000; i++)
-        //         db_find(table_id, i, value, &val_size, trx_id);
-
-        // for (int i = 0; i < 3; i++)
-        //     printf("%d : %fsec\n", i, clocks[i] / CLOCKS_PER_SEC);
-
-        // return 0;
-
         printf("\t[FIND START]\n");
         for (const auto& i : keys) {
             memset(value, 0x00, 112);
@@ -279,9 +267,6 @@ int main() {
             // }
         }
         printf("\t[FIND END]\n");
-
-        // print_tree(table_id);
-        // printf("\n");
 
         printf("\t[DELETE START]\n");
         for (const auto& i : keys) {
@@ -297,25 +282,13 @@ int main() {
             if (db_find(table_id, i, value, &val_size, trx_id) == 0) goto func_exit;
         }
         printf("\t[FIND END AGAIN]\n");
-
-        // print_tree(table_id);
-        // printf("\n");
     }
     trx_commit(trx_id);
 
     printf("\n[TEST END]\n\n");    
 
-    // printf("%fsec\n", clocks[0] / CLOCKS_PER_SEC);
-    // printf("try_count : %d\n", try_count);
-    // printf("write_count : %d\n", write_count);
-    // printf("read_count : %d\n", read_count);
-
 	func_exit:
 	printf("[SHUTDOWN START]\n");
-    // print_freepg_list(table_id);
-    // printf("\n");
-	// print_tree(table_id);
-    // printf("\n");
 	if (shutdown_db() != 0) {
 		return 0;
 	}

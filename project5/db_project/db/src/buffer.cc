@@ -54,7 +54,19 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
     pthread_mutex_lock(&buffer_latch);
 
     int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
-    if (buffer_idx == -1) {
+    if (buffer_idx != -1) {
+        if (buffers[buffer_idx] == NULL) {
+            buffers[buffer_idx] = new buffer_t;
+            buffers[buffer_idx]->is_dirty = 0;
+            buffers[buffer_idx]->page_latch = PTHREAD_MUTEX_INITIALIZER;
+            buffers[buffer_idx]->prev_LRU = NULL;
+            buffers[buffer_idx]->next_LRU = NULL;
+            buffers[buffer_idx]->table_id = table_id;
+            buffers[buffer_idx]->page_num = page_num;
+            file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
+        }
+        pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
+    } else {
         buffer_t* victim;
         for (victim = buffers[buffer_get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
             if (pthread_mutex_trylock(&(victim->page_latch)) != EBUSY) break;
@@ -69,18 +81,6 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         buffers[buffer_idx]->table_id = table_id;
         buffers[buffer_idx]->page_num = page_num;
         file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
-    } else {
-        if (buffers[buffer_idx] == NULL) {
-            buffers[buffer_idx] = new buffer_t;
-            buffers[buffer_idx]->is_dirty = 0;
-            buffers[buffer_idx]->page_latch = PTHREAD_MUTEX_INITIALIZER;
-            buffers[buffer_idx]->prev_LRU = NULL;
-            buffers[buffer_idx]->next_LRU = NULL;
-            buffers[buffer_idx]->table_id = table_id;
-            buffers[buffer_idx]->page_num = page_num;
-            file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
-        }
-        pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
     }
 
     if (buffers[buffer_idx]->prev_LRU != NULL)

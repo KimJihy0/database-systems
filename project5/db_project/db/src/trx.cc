@@ -19,6 +19,7 @@ int init_lock_table() {
         return -1;
     if (pthread_mutex_init(&trx_latch, 0) != 0)
         return -1;
+    trx_id = 0;
     return 0;
 }
 
@@ -68,7 +69,7 @@ int trx_abort(int trx_id) {
     while (!(trx_table[trx_id]->logs.empty())) {
         log = &(trx_table[trx_id]->logs.top());
         buffer_read_page(log->table_id, log->page_num, &p);
-        memcpy(p->values + log->offset, log->old_value, log->size);
+        memcpy((char*)p + log->offset, log->old_value, log->size);
         buffer_write_page(log->table_id, log->page_num);
         trx_table[trx_id]->logs.pop();
     }
@@ -186,9 +187,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
             cur_obj = lock_entry->head;
-            continue;
+        } else {
+            cur_obj = cur_obj->next_lock;
         }
-        cur_obj = cur_obj->next_lock;
     }
 
     pthread_mutex_unlock(&lock_latch);
