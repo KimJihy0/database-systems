@@ -86,8 +86,8 @@ int trx_abort(int trx_id) {
 
 void trx_rollback(int trx_id) {
     page_t* undo_page;
-    // log_t* undo_log = (log_t*)malloc(272);
-    log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    log_t* undo_log = (log_t*)malloc(300);
+    // log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     uint64_t undo_LSN = trx_table[trx_id]->last_LSN;
     while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
         uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, COMPENSATE,
@@ -218,11 +218,11 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
                 pthread_mutex_unlock(&lock_latch);
                 return -1;
             }
-            buffer_unpin_page(table_id, page_num);
+            // buffer_unpin_page(table_id, page_num);
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-    pthread_mutex_unlock(&lock_latch);
-            buffer_request_page(table_id, page_num);
-    pthread_mutex_lock(&lock_latch);
+    // pthread_mutex_unlock(&lock_latch);
+            // buffer_request_page(table_id, page_num);
+    // pthread_mutex_lock(&lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
             cur_obj = lock_entry->head;
         } else {

@@ -62,7 +62,8 @@ void anls_pass(FILE* fp) {
 
 int redo_pass(FILE* fp, int log_num) {
     fprintf(fp, "[REDO] Redo pass start.\n");
-    log_t* redo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    log_t* redo_log = (log_t*)malloc(300);
+    // log_t* redo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     page_t* redo_page;
     uint64_t cur_LSN = 0;
     int count = log_num;
@@ -122,7 +123,8 @@ int redo_pass(FILE* fp, int log_num) {
 int undo_pass(FILE* fp, int log_num) {
     fprintf(fp, "[UNDO] Undo pass start.\n");
     page_t* undo_page;
-    log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    log_t* undo_log = (log_t*)malloc(300);
+    // log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     int count = log_num;
     for  (const auto& loser : losers) {
         uint64_t undo_LSN = trx_get_last_LSN(loser);
