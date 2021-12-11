@@ -2,6 +2,7 @@
 
 #include <errno.h>
 
+#include <unistd.h> //
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -71,7 +72,8 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         }
         // pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
         if (pthread_mutex_trylock(&(buffers[buffer_idx]->page_latch)) == EBUSY) {
-            pthread_mutex_unlock(&buffer_latch);   
+            pthread_mutex_unlock(&buffer_latch);
+            sleep(1);
             goto start;
         }
     } else {
@@ -150,16 +152,6 @@ void buffer_write_page(int64_t table_id, pagenum_t page_num) {
     int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
     buffers[buffer_idx]->is_dirty = 1;
     pthread_mutex_unlock(&(buffers[buffer_idx]->page_latch));
-}
-
-void buffer_dirty_page(int64_t table_id, pagenum_t page_num) {
-    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
-    buffers[buffer_idx]->is_dirty = 1;
-}
-
-void buffer_pin_page(int64_t table_id, pagenum_t page_num) {
-    int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
-    pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
 }
 
 void buffer_unpin_page(int64_t table_id, pagenum_t page_num) {

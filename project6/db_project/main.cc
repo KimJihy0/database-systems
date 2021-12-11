@@ -11,8 +11,8 @@
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (10)
-#define SEARCH_THREADS_NUMBER   (5)
+#define UPDATE_THREADS_NUMBER   (5)
+#define SEARCH_THREADS_NUMBER   (1)
 
 #define UPDATE_COUNT            (50)
 #define SEARCH_COUNT            (50)
@@ -79,10 +79,10 @@ int main() {
 
     table_id = open_table((char*)"DATA50");
 
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2558);
-    // shutdown_db();
-    // return 0;
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
+    shutdown_db();
+    return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &i);

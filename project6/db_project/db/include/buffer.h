@@ -28,9 +28,6 @@ pagenum_t buffer_alloc_page(int64_t table_id);
 void buffer_free_page(int64_t table_id, pagenum_t page_num);
 void buffer_read_page(int64_t table_id, pagenum_t page_num, page_t** dest);
 void buffer_write_page(int64_t table_id, pagenum_t page_num);
-
-void buffer_dirty_page(int64_t table_id, pagenum_t page_num);
-void buffer_pin_page(int64_t table_id, pagenum_t page_num);
 void buffer_unpin_page(int64_t table_id, pagenum_t page_num);
 void buffer_flush();
 

@@ -56,7 +56,7 @@ void trx_set_last_LSN(int trx_id, uint64_t last_LSN);
 void trx_resurrect_entry(int trx_id);
 void trx_remove_entry(int trx_id);
 
-int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode, page_t* p = NULL);
+int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode, page_t** p);
 lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
