@@ -40,19 +40,19 @@ int db_find(int64_t table_id, int64_t key,
     for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
     }
-    buffer_unpin_page(table_id, p_pgnum);
+    // buffer_unpin_page(table_id, p_pgnum);
 
     if (i == num_keys) {
-        // buffer_unpin_page(table_id, p_pgnum);
+        buffer_unpin_page(table_id, p_pgnum);
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED) != 0) {
-        // buffer_unpin_page(table_id, p_pgnum);
+        buffer_unpin_page(table_id, p_pgnum);
         trx_abort(trx_id);
         return trx_id;
     }
 
-    buffer_request_page(table_id, p_pgnum);
+    // buffer_request_page(table_id, p_pgnum);
     uint16_t offset = p->slots[i].offset;
     uint16_t size = p->slots[i].size;
     *val_size = p->slots[i].size;
@@ -79,19 +79,19 @@ int db_update(int64_t table_id, int64_t key,
     for (i = 0; i < num_keys; i++) {
         if (p->slots[i].key == key) break;
     }
-    buffer_unpin_page(table_id, p_pgnum);
+    // buffer_unpin_page(table_id, p_pgnum);
 
     if (i == num_keys) {
-        // buffer_unpin_page(table_id, p_pgnum);   
+        buffer_unpin_page(table_id, p_pgnum);   
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE, p) != 0) {
-        // buffer_unpin_page(table_id, p_pgnum);   
+        buffer_unpin_page(table_id, p_pgnum);   
         trx_abort(trx_id);
         return trx_id;
     }
 
-    buffer_request_page(table_id, p_pgnum);
+    // buffer_request_page(table_id, p_pgnum);
     uint16_t offset = p->slots[i].offset;
     uint16_t size = p->slots[i].size;
     *old_val_size = size;

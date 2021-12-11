@@ -70,6 +70,9 @@ int main() {
 
     srand(time(__null));
 
+    // create_db("DATA50", 50);
+    // return 0;
+
     init_db(NUM_BUFS, 0, 0, (char*)"logfile.data", (char*)"logmsg.txt");
 
     int64_t table_id;
@@ -122,6 +125,7 @@ std::string gen_rand_val(int size) {
 }
 
 int create_db(const char* pathname, int num_keys) {
+    init_db(10000, 0, 0, (char*)"logfile.data", (char*)"logmsg.txt");
     std::random_device rd;
 	std::mt19937 gen(rd());
 	std::default_random_engine rng(rd());
@@ -137,6 +141,7 @@ int create_db(const char* pathname, int num_keys) {
         sprintf(value, "%02d", i % 100);
         if (db_insert(table_id, i, value, SIZE(i)) != 0) return table_id;
     }
+    shutdown_db();
     return table_id;
 }
 

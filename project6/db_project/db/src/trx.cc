@@ -218,11 +218,11 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
                 pthread_mutex_unlock(&lock_latch);
                 return -1;
             }
-            // buffer_unpin_page(table_id, page_num);
+            buffer_unpin_page(table_id, page_num);
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-    // pthread_mutex_unlock(&lock_latch);
-    //         buffer_request_page(table_id, page_num);
-    // pthread_mutex_lock(&lock_latch);
+    pthread_mutex_unlock(&lock_latch);
+            buffer_request_page(table_id, page_num);
+    pthread_mutex_lock(&lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
             cur_obj = lock_entry->head;
         } else {

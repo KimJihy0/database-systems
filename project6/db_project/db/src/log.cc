@@ -47,8 +47,7 @@ int init_log(char* log_path) {
 }
 
 int shutdown_log() {
-    // log_force();
-    ftruncate(log_fd, 0);
+    // ftruncate(log_fd, 0);
     delete[] logbuffer;
     close(log_fd);
     pthread_mutex_destroy(&logbuffer_latch);
