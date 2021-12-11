@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define logfile 0
+#define logfile 1
 
 static char* logbuffer;
 static int log_tail;
@@ -45,6 +45,11 @@ int shutdown_log() {
     delete[] logbuffer;
     close(log_fd);
     pthread_mutex_destroy(&logbuffer_latch);
+
+    #if logfile
+    fclose(logfile_fp);
+    #endif
+    
     return 0;
 }
 
