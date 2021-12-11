@@ -23,8 +23,6 @@ typedef uint64_t pagenum_t;
 
 #pragma pack(push, 1)
 struct log_header_t {
-    log_header_t(uint32_t log_size, uint64_t LSN, uint64_t prev_LSN, int trx_id, int type) :
-        log_size(log_size), LSN(LSN), prev_LSN(prev_LSN), trx_id(trx_id), type(type) {}
     uint32_t log_size;
     uint64_t LSN;
     uint64_t prev_LSN;
@@ -33,10 +31,6 @@ struct log_header_t {
 };
 
 struct log_t {
-    log_t(uint32_t log_size, uint64_t LSN, uint64_t prev_LSN, int trx_id, int type,
-          int64_t table_id, pagenum_t page_num, uint16_t offset, uint16_t size) :
-          log_size(log_size), LSN(LSN), prev_LSN(prev_LSN), trx_id(trx_id), type(type),
-          table_id(table_id), page_num(page_num), offset(offset), size(size) {}
     uint32_t log_size;
     uint64_t LSN;
     uint64_t prev_LSN;

@@ -26,7 +26,6 @@ void print_all(int64_t table_id);
 void* update_thread_func(void* arg) {
     int64_t keys[UPDATE_COUNT];
     uint16_t old_size;
-    int* table_id = (int*)arg;
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -35,7 +34,7 @@ void* update_thread_func(void* arg) {
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
-        db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
+        db_update(1, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
@@ -48,7 +47,6 @@ void* search_thread_func(void* arg) {
     int64_t keys[SEARCH_COUNT];
     char ret_val[108];
     uint16_t old_size;
-    int* table_id = (int*)arg;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
         keys[i] = rand() % NUM_KEYS;
@@ -56,7 +54,7 @@ void* search_thread_func(void* arg) {
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
-        db_find(*table_id, keys[i], ret_val, &old_size, trx_id);
+        db_find(1, keys[i], ret_val, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Search thread is done(commit).\n");
     else
@@ -77,9 +75,9 @@ int main() {
     printf("file creation complete(%ld).\n", table_id);
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
-        pthread_create(&update_threads[i], 0, update_thread_func, &table_id);
+        pthread_create(&update_threads[i], 0, update_thread_func, &i);
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
-        pthread_create(&search_threads[i], 0, search_thread_func, &table_id);
+        pthread_create(&search_threads[i], 0, search_thread_func, &i);
         
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_join(update_threads[i], NULL);

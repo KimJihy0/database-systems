@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define logfile 1
+#define logfile 0
 
 static char* logbuffer;
 static int log_tail;
@@ -49,7 +49,7 @@ int shutdown_log() {
     #if logfile
     fclose(logfile_fp);
     #endif
-    
+
     return 0;
 }
 
@@ -83,8 +83,16 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type) {
     log_consider_force(log_size);
 
     uint64_t src_LSN = LSN;
-    log_header_t new_log(log_size, LSN, prev_LSN, trx_id, type);
-    memcpy(logbuffer + log_tail, &new_log, log_size);
+
+    log_header_t* new_log = (log_header_t*)malloc(log_size);
+    new_log->log_size = log_size;
+    new_log->LSN = LSN;
+    new_log->prev_LSN = prev_LSN;
+    new_log->trx_id = trx_id;
+    new_log->type = type;
+    memcpy(logbuffer + log_tail, new_log, log_size);
+    free(new_log);
+
     log_tail += log_size;
     LSN += log_size;
 
@@ -123,6 +131,8 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type,
     if (type == COMPENSATE)
         memcpy(new_log->trailer + 2 * size, &next_undo_LSN, 8);
     memcpy(logbuffer + log_tail, new_log, log_size);
+    free(new_log);
+
     log_tail += log_size;
     LSN += log_size;
 
