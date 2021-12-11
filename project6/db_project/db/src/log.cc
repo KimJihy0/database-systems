@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define logfile 1
+#define logfile 0
 
 static char* logbuffer;
 static int log_tail;
