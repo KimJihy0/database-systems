@@ -18,7 +18,7 @@
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
-int create_db(const char* pathname);
+int create_db(const char* pathname, int num_keys = NUM_KEYS);
 void print_page(pagenum_t page_num, page_t page);
 void print_pgnum(int64_t table_id, pagenum_t page_num);
 void print_all(int64_t table_id);
@@ -34,7 +34,7 @@ void* update_thread_func(void* arg) {
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
-        db_update(1, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
+        db_update(50, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
@@ -54,7 +54,7 @@ void* search_thread_func(void* arg) {
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
-        db_find(1, keys[i], ret_val, &old_size, trx_id);
+        db_find(50, keys[i], ret_val, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Search thread is done(commit).\n");
     else
@@ -71,8 +71,15 @@ int main() {
     srand(time(__null));
 
     init_db(NUM_BUFS, 0, 0, (char*)"logfile.data", (char*)"logmsg.txt");
-    int64_t table_id = create_db("DATA1");
-    printf("file creation complete(%ld).\n", table_id);
+
+    int64_t table_id;
+
+    table_id = open_table((char*)"DATA50");
+
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
+    shutdown_db();
+    return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &i);
@@ -86,6 +93,8 @@ int main() {
 
     print_pgnum(table_id, 2559);
     print_pgnum(table_id, 2558);
+
+    return 0;
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
@@ -112,14 +121,14 @@ std::string gen_rand_val(int size) {
     return helper_function(gen, char_dis, size);
 }
 
-int create_db(const char* pathname) {
+int create_db(const char* pathname, int num_keys) {
     std::random_device rd;
 	std::mt19937 gen(rd());
 	std::default_random_engine rng(rd());
 	char value[112];
 	uint16_t val_size;
 	std::vector<int> keys;
-	for (int i = 0; i < NUM_KEYS; i++) {
+	for (int i = 0; i < num_keys; i++) {
 		keys.push_back(i);
 	}
     shuffle(keys.begin(), keys.end(), rng);

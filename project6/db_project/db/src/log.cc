@@ -23,25 +23,32 @@ FILE* logfile_fp;
 #endif
 
 int init_log(char* log_path) {
+
+    #if logfile
+    if ((logfile_fp = fopen("readable_logfile.csv", "w")) == NULL)
+        ERR_SYS("failure to open readable_logfile(fopen error).");
+    fprintf(logfile_fp, "log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size, old_image, new_image, next_undo_LSN\n");
+    #endif
+
     logbuffer = new char[LOGBUF_SIZE];
     log_fd = open(log_path, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (log_fd < 0)
         ERR_SYS("Failure to open log file(open error)");
     LSN = lseek(log_fd, 0, SEEK_END);
+    printf("LSN : %ld\n", LSN);
     flushed_LSN = lseek(log_fd, 0, SEEK_END);
     log_tail = 0;
+    if (LSN == 0) {
+        log_write_log(0, 0, -1);
+    }
     pthread_mutex_init(&logbuffer_latch, 0);
-
-    #if logfile
-    logfile_fp = fopen("readable_logfile.csv", "w");
-    fprintf(logfile_fp, "log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size, old_image, new_image, next_undo_LSN\n");
-    #endif
 
     return 0;
 }
 
 int shutdown_log() {
-    log_force();
+    // log_force();
+    ftruncate(log_fd, 0);
     delete[] logbuffer;
     close(log_fd);
     pthread_mutex_destroy(&logbuffer_latch);
@@ -115,7 +122,6 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type,
 
     uint64_t src_LSN = LSN;
 
-    // log_t new_log(log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size);
     log_t* new_log = (log_t*)malloc(log_size);
     new_log->log_size = log_size;
     new_log->LSN = LSN;

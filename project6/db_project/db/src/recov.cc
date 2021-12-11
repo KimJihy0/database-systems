@@ -10,28 +10,45 @@ static std::set<int> winners;
 static std::set<int> losers;
 
 void recovery(int flag, int log_num, char* logmsg_path) {
+    int crash = 0;
+
     FILE* fp = fopen(logmsg_path, "w");
     anls_pass(fp);
-    redo_pass(fp);
-    undo_pass(fp);
+    if (!crash) {
+        crash = redo_pass(fp, flag == 1 ? log_num : -1);
+    }
+    if (!crash) {
+        crash = undo_pass(fp, flag == 2 ? log_num : -1);
+    }
     fclose(fp);
 
     buffer_flush();
+    file_close_table_file();
     log_force();
-    trunc_log();
 }
 
 void anls_pass(FILE* fp) {
     fprintf(fp, "[ANALYSIS] Analysis pass start.\n");
     log_t* anls_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     uint64_t cur_LSN = 0;
+    std::set<int> tables;
     while (cur_LSN = log_read_log(cur_LSN, anls_log)) {
+        if (anls_log->table_id && tables.find(anls_log->table_id) == tables.end()) {
+            char pathname[256];
+            sprintf(pathname, "DATA%ld", anls_log->table_id);
+            file_open_table_file(pathname);
+            tables.insert(anls_log->table_id);
+        }
+        if (anls_log->trx_id > trx_get_trx_id()) trx_set_trx_id(anls_log->trx_id);
         if (anls_log->type == BEGIN) {
             losers.insert(anls_log->trx_id);
         } else if (anls_log->type == COMMIT || anls_log->type == ROLLBACK) {
             losers.erase(anls_log->trx_id);
             winners.insert(anls_log->trx_id);
         }
+    }
+    for (const auto& loser : losers) {
+        trx_resurrect_entry(loser);
     }
     fprintf(fp, "[ANALYSIS] Analysis pass end");
     fprintf(fp, ". Winner:");
@@ -43,17 +60,22 @@ void anls_pass(FILE* fp) {
     fprintf(fp, "\n");
 }
 
-void redo_pass(FILE* fp) {
+int redo_pass(FILE* fp, int log_num) {
     fprintf(fp, "[REDO] Redo pass start.\n");
     log_t* redo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    page_t* redo_page;
     uint64_t cur_LSN = 0;
+    int count = log_num;
     while (cur_LSN = log_read_log(cur_LSN, redo_log)) {
+        if (count-- == 0) {
+            free(redo_log);
+            return 1;
+        }
         switch (redo_log->type) {
             case BEGIN:
                 fprintf(fp, "LSN %lu [BEGIN] Transaction id %d\n", redo_log->LSN, redo_log->trx_id);
                 break;
             case UPDATE:
-                page_t* redo_page;
                 buffer_read_page(redo_log->table_id, redo_log->page_num, &redo_page);
                 if (redo_log->LSN > redo_page->page_LSN) {
                     memcpy((char*)redo_page + redo_log->offset, redo_log->trailer + redo_log->size, redo_log->size);
@@ -75,20 +97,40 @@ void redo_pass(FILE* fp) {
                 fprintf(fp, "LSN %lu [ROLLBACK] Transaction id %d\n", redo_log->LSN, redo_log->trx_id);
                 break;
             case COMPENSATE:
-                fprintf(fp, "LSN %lu [COMPENSATE] next undo lsn %lu\n", redo_log->LSN, *(redo_log->trailer + 2 * redo_log->size));
+                buffer_read_page(redo_log->table_id, redo_log->page_num, &redo_page);
+                if (redo_log->LSN > redo_page->page_LSN) {
+                    memcpy((char*)redo_page + redo_log->offset, redo_log->trailer + redo_log->size, redo_log->size);
+                    redo_page->page_LSN = redo_log->LSN;
+                    buffer_write_page(redo_log->table_id, redo_log->page_num);
+                    // fprintf(fp, "LSN %lu [UPDATE] Transaction id %d redo apply\n", redo_log->LSN, redo_log->trx_id);
+                    fprintf(fp, "LSN %lu [COMPENSATE] next undo lsn %lu\n", redo_log->LSN, *(redo_log->trailer + 2 * redo_log->size));
+                } else {
+                    buffer_unpin_page(redo_log->table_id, redo_log->page_num);
+                    fprintf(fp, "LSN %lu [CONSIDER-REDO] Transaction id %d\n", redo_log->LSN, redo_log->trx_id);
+                }
+                if (trx_is_active(redo_log->trx_id)) {
+                    trx_set_last_LSN(redo_log->trx_id, redo_log->LSN);
+                }
                 break;
         }
     }
+    free(redo_log);
     fprintf(fp, "[REDO] Redo pass end.\n");
+    return 0;
 }
 
-void undo_pass(FILE* fp) {
+int undo_pass(FILE* fp, int log_num) {
     fprintf(fp, "[UNDO] Undo pass start.\n");
     page_t* undo_page;
     log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    int count = log_num;
     for  (const auto& loser : losers) {
         uint64_t undo_LSN = trx_get_last_LSN(loser);
         while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
+            if (count-- == 0) {
+                free(undo_log);
+                return 1;
+            }
             uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
                     undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
                     undo_log->trailer + undo_log->size, undo_log->trailer, undo_log->prev_LSN);
@@ -108,4 +150,5 @@ void undo_pass(FILE* fp) {
     }
     free(undo_log);
     fprintf(fp, "[UNDO] Undo pass end.\n");
+    return 0;
 }

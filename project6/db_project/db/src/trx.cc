@@ -7,7 +7,7 @@ static pthread_mutex_t lock_latch;
 static pthread_mutex_t trx_latch;
 static std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash> lock_table;
 static std::unordered_map<int, trx_entry_t*> trx_table;
-static int trx_id;
+int trx_id;
 
 int init_lock_table() {
     if (pthread_mutex_init(&lock_latch, 0) != 0)
@@ -103,6 +103,14 @@ void trx_rollback(int trx_id) {
         undo_LSN = undo_log->prev_LSN;
     }
     free(undo_log);
+}
+
+int trx_get_trx_id() {
+    return trx_id;
+}
+
+void trx_set_trx_id(int set_trx_id) {
+    trx_id = set_trx_id;
 }
 
 int trx_is_active(int trx_id) {
@@ -210,11 +218,11 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
                 pthread_mutex_unlock(&lock_latch);
                 return -1;
             }
-            buffer_unpin_page(table_id, page_num);
+            // buffer_unpin_page(table_id, page_num);
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-    pthread_mutex_unlock(&lock_latch);
-            buffer_request_page(table_id, page_num);
-    pthread_mutex_lock(&lock_latch);
+    // pthread_mutex_unlock(&lock_latch);
+    //         buffer_request_page(table_id, page_num);
+    // pthread_mutex_lock(&lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
             cur_obj = lock_entry->head;
         } else {

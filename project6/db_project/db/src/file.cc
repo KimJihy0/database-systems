@@ -136,5 +136,8 @@ void file_write_page(int64_t table_id, pagenum_t page_num, const page_t* src) {
 void file_close_table_file() {
     for (int i = 0; i < idx; i++) {
         close(fds[i]);
+        fds[i] = 0;
     }
+    tables.clear();
+    idx = 0;
 }

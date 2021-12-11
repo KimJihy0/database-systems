@@ -48,6 +48,8 @@ int trx_commit(int trx_id);
 int trx_abort(int trx_id);
 void trx_rollback(int trx_id);
 
+int trx_get_trx_id();
+void trx_set_trx_id(int trx_id);
 int trx_is_active(int trx_id);
 uint64_t trx_get_last_LSN(int trx_id);
 void trx_set_last_LSN(int trx_id, uint64_t last_LSN);

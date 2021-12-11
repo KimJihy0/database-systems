@@ -16,7 +16,8 @@
 #define next_undo_LSN(log)    ((log)->trailer + 2 * (log)->size)
 
 #ifndef ERR_SYS
-#define ERR_SYS(s) ({ perror((s)); exit(1); })
+// #define ERR_SYS(s) ({ perror((s)); exit(1); })
+#define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
 #endif
 
 typedef uint64_t pagenum_t;
