@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+#include <set>
 
-static std::vector<int> winners;
-static std::vector<int> losers;
+static std::set<int> winners;
+static std::set<int> losers;
 
 void recovery(int flag, int log_num, char* logmsg_path) {
     FILE* fp = fopen(logmsg_path, "w");
@@ -14,6 +15,7 @@ void recovery(int flag, int log_num, char* logmsg_path) {
     redo_pass(fp);
     undo_pass(fp);
     fclose(fp);
+
     buffer_flush();
     log_force();
     trunc_log();
@@ -24,18 +26,13 @@ void anls_pass(FILE* fp) {
     log_t* anls_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     uint64_t cur_LSN = 0;
     while (cur_LSN = log_read_log(cur_LSN, anls_log)) {
-        if (anls_log->type == COMMIT || anls_log->type == ROLLBACK) {
-            winners.push_back(anls_log->trx_id);
-        }
-        else if (anls_log->type == BEGIN) {
-            if (find(winners.begin(), winners.end(), anls_log->trx_id) == winners.end()) {
-                losers.push_back(anls_log->trx_id);
-                trx_resurrect_entry(anls_log->trx_id);
-            }
+        if (anls_log->type == BEGIN) {
+            losers.insert(anls_log->trx_id);
+        } else if (anls_log->type == COMMIT || anls_log->type == ROLLBACK) {
+            losers.erase(anls_log->trx_id);
+            winners.insert(anls_log->trx_id);
         }
     }
-    sort(winners.begin(), winners.end());
-    sort(losers.begin(), losers.end());
     fprintf(fp, "[ANALYSIS] Analysis pass end");
     fprintf(fp, ". Winner:");
     for (const auto& winner : winners)
@@ -89,9 +86,7 @@ void undo_pass(FILE* fp) {
     fprintf(fp, "[UNDO] Undo pass start.\n");
     page_t* undo_page;
     log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
-    while (!losers.empty()) {
-        int loser = losers.back();
-        
+    for  (const auto& loser : losers) {
         uint64_t undo_LSN = trx_get_last_LSN(loser);
         while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
             uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
@@ -110,8 +105,6 @@ void undo_pass(FILE* fp) {
         }
         log_write_log(trx_get_last_LSN(loser), loser, ROLLBACK);
         trx_remove_entry(loser);
-
-        losers.pop_back();
     }
     free(undo_log);
     fprintf(fp, "[UNDO] Undo pass end.\n");

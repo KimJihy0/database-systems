@@ -36,7 +36,7 @@ void* update_thread_func(void* arg) {
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
         db_update(*table_id, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
-    if (trx_commit(trx_id) == trx_id)
+    if (trx_abort(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
         printf("Update thread is done(abort).(%s)\n", (char*)value.c_str());

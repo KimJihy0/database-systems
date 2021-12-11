@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define logfile 0
+#define logfile 1
 
 static char* logbuffer;
 static int log_tail;
@@ -24,7 +24,7 @@ FILE* logfile_fp;
 
 int init_log(char* log_path) {
     logbuffer = new char[LOGBUF_SIZE];
-    log_fd = open(log_path, O_RDWR | O_CREAT, 0644);
+    log_fd = open(log_path, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (log_fd < 0)
         ERR_SYS("Failure to open log file(open error)");
     LSN = lseek(log_fd, 0, SEEK_END);
@@ -84,8 +84,8 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type) {
     LSN += log_size;
 
     #if logfile
-    const char* types[] = { "BEGIN", "UPDATE", "COMMIT", "ROLLBACK", "COMPENSATE", "NIL"};
-    fprintf(logfile_fp, "%u, %lu, %lu, %d, %s\n", log_size, src_LSN, prev_LSN, trx_id, types[type % 6]);
+    const char* types[] = { "BEGIN", "UPDATE", "COMMIT", "ROLLBACK", "COMPENSATE" };
+    fprintf(logfile_fp, "%u, %lu, %lu, %d, %s\n", log_size, src_LSN, prev_LSN, trx_id, type < 0 ? "NIL" : types[type]);
     #endif
 
     pthread_mutex_unlock(&logbuffer_latch);
@@ -137,7 +137,6 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type,
 
 void log_consider_force(uint32_t log_size) {
     if (log_tail + log_size > LOGBUF_SIZE) {
-        lseek(log_fd, 0, SEEK_END);
         if (write(log_fd, logbuffer, log_tail) != log_tail)
             ERR_SYS("Failure to force log(write error)");
         flushed_LSN = LSN;
@@ -147,7 +146,6 @@ void log_consider_force(uint32_t log_size) {
 
 void log_force() {
     pthread_mutex_lock(&logbuffer_latch);
-    lseek(log_fd, 0, SEEK_END);
     if (write(log_fd, logbuffer, log_tail) != log_tail)
         ERR_SYS("Failure to force log(write error)");
     flushed_LSN = LSN;
@@ -156,8 +154,6 @@ void log_force() {
 }
 
 /* ---To do.---
- * anls_pass() 다시짜기
- * O_APPEND read는 lseek로 가능한지 확인
  * NIL 처리
  * trunc_log()?
  * 로그버퍼사이즈는 자유인지
@@ -172,6 +168,8 @@ void log_force() {
  * 8byte 4byte 확인
  * 
  * ---Done.---
+ * O_APPEND read는 lseek로 가능한지 확인 -> 가능!
+ * anls_pass() 다시짜기
  * insert, delete : find_leaf 이후에 직접 중복검사
  * LSN mutex
  * 

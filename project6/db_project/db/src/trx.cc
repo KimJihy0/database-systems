@@ -29,7 +29,7 @@ int shutdown_lock_table() {
 int trx_begin() {
     pthread_mutex_lock(&trx_latch);
     int local_trx_id = ++trx_id;
-    int64_t ret_LSN = log_write_log(-1, trx_id, BEGIN);
+    int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
