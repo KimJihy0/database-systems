@@ -63,9 +63,9 @@ int trx_commit(int trx_id) {
 
 int trx_abort(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
-    pthread_mutex_lock(&lock_latch);
-
     trx_rollback(trx_id);
+
+    pthread_mutex_lock(&lock_latch);
 
     log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 

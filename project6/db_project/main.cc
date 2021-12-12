@@ -79,10 +79,10 @@ int main() {
 
     table_id = open_table((char*)"DATA50");
 
-    print_pgnum(table_id, 2559);
-    print_pgnum(table_id, 2558);
-    shutdown_db();
-    return 0;
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2558);
+    // shutdown_db();
+    // return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, &i);
