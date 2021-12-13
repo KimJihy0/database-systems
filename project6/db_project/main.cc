@@ -11,7 +11,7 @@
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (5)
+#define UPDATE_THREADS_NUMBER   (8)
 #define SEARCH_THREADS_NUMBER   (1)
 
 #define UPDATE_COUNT            (50)
@@ -29,12 +29,12 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-        // keys[i] = i;
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
-        db_update(50, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
+        db_update(NUM_KEYS, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
     else
@@ -49,12 +49,12 @@ void* search_thread_func(void* arg) {
     uint16_t old_size;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
-        // keys[i] = i;
+        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
-        db_find(50, keys[i], ret_val, &old_size, trx_id);
+        db_find(NUM_KEYS, keys[i], ret_val, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
         printf("Search thread is done(commit).\n");
     else
@@ -70,19 +70,22 @@ int main() {
 
     srand(time(__null));
 
-    // create_db("DATA50", 50);
+    char pathname[256];
+    sprintf(pathname, "DATA%d", NUM_KEYS);
+
+    // create_db(pathname, NUM_KEYS);
     // return 0;
 
     init_db(NUM_BUFS, 0, 0, (char*)"logfile.data", (char*)"logmsg.txt");
 
     int64_t table_id;
 
-    table_id = open_table((char*)"DATA50");
+    table_id = open_table(pathname);
 
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2558);
-    // shutdown_db();
-    // return 0;
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
+    shutdown_db();
+    return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, 0);

@@ -127,7 +127,7 @@ pagenum_t find_leaf(int64_t table_id, int64_t key) {
         }
     buffer_unpin_page(table_id, p_pgnum);
     return p_pgnum;
-    }
+}
 
 // INSERTION
 
