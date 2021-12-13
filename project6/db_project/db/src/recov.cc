@@ -29,7 +29,8 @@ void recovery(int flag, int log_num, char* logmsg_path) {
 
 void anls_pass(FILE* fp) {
     fprintf(fp, "[ANALYSIS] Analysis pass start.\n");
-    log_t* anls_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    log_t* anls_log = (log_t*)malloc(300);
+    // log_t* anls_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     uint64_t cur_LSN = 0;
     std::set<int> tables;
     while (cur_LSN = log_read_log(cur_LSN, anls_log)) {
@@ -47,6 +48,7 @@ void anls_pass(FILE* fp) {
             winners.insert(anls_log->trx_id);
         }
     }
+    free(anls_log);
     for (const auto& loser : losers) {
         trx_resurrect_entry(loser);
     }
