@@ -155,7 +155,7 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type,
 }
 
 void log_consider_force(uint32_t log_size) {
-    if (log_tail + log_size > LOGBUF_SIZE) {
+    if (log_tail + log_size >= LOGBUF_SIZE) {
         if (write(log_fd, logbuffer, log_tail) != log_tail)
             ERR_SYS("Failure to force log(write error)");
         flushed_LSN = LSN;
