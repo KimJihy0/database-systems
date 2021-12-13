@@ -3,7 +3,9 @@
 
 #include <stdio.h>
 
+#include "buffer.h"
 #include "trx.h"
+#include "log.h"
 
 void recovery(int flag, int log_num, char* logmsg_path);
 void anls_pass(FILE* fp);

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "buffer.h"
+#include "log.h"
 
 #define SHARED      0
 #define EXCLUSIVE   1

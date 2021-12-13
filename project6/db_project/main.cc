@@ -85,9 +85,9 @@ int main() {
     // return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
-        pthread_create(&update_threads[i], 0, update_thread_func, &i);
+        pthread_create(&update_threads[i], 0, update_thread_func, 0);
     for (int i = 0; i < SEARCH_THREADS_NUMBER; i++)
-        pthread_create(&search_threads[i], 0, search_thread_func, &i);
+        pthread_create(&search_threads[i], 0, search_thread_func, 0);
         
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_join(update_threads[i], NULL);

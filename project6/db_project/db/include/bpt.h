@@ -1,7 +1,10 @@
 #ifndef DB_BPT_H_
 #define DB_BPT_H_
 
+#include "buffer.h"
 #include "recov.h"
+#include "trx.h"
+#include "log.h"
 
 #define HEADER_SIZE     128
 #define FREE_SPACE      3968

@@ -47,7 +47,6 @@ int init_log(char* log_path) {
 }
 
 int shutdown_log() {
-    // ftruncate(log_fd, 0);
     delete[] logbuffer;
     close(log_fd);
     pthread_mutex_destroy(&logbuffer_latch);
@@ -174,20 +173,22 @@ void log_force() {
 }
 
 /* ---To do.---
- * NIL 처리
- * trunc_log()?
- * 로그버퍼사이즈는 자유인지
-
- * reopen 처리.
- * trx_state
  * trx_entry에서 삭제한건데 왜 state가 필요한지.
+ * trx_state
+ * get_last_LSN(), set_last_LSN() -> log_write_log로 넣어버리기
+ * page_latch <-> lock_latch 데드락
+ * recov.h, trx.h, log.h -> 소스코드로?
+
  * 가변멤버 new delete 가능?
- * rollback할때 page_LSN 갱신해야되는거 아닌가...
+ * 8byte 4byte 확인 (next_undo_LSN)
  * trx_table[trx_id]->last_LSN 확인
- * get_last_LSN(), set_last_LSN() 다 없애기
- * 8byte 4byte 확인
+ * trunc_log()?
  * 
  * ---Done.---
+ * reopen 처리.
+ * NIL 처리
+ * rollback할때 page_LSN 갱신해야되는거 아닌가...
+ * 로그버퍼사이즈는 자유인지
  * O_APPEND read는 lseek로 가능한지 확인 -> 가능!
  * anls_pass() 다시짜기
  * insert, delete : find_leaf 이후에 직접 중복검사

@@ -817,11 +817,13 @@ void redistribute_pages(int64_t table_id, pagenum_t p_pgnum,
 
 void end_tree(int64_t table_id, pagenum_t root_pgnum) {
     page_t* header;
+    
     buffer_read_page(table_id, 0, &header);
 
     header->root_num = 0;
 
     buffer_write_page(table_id, 0);
+
     buffer_free_page(table_id, root_pgnum);
 }
 

@@ -40,12 +40,10 @@ int trx_begin() {
 
 int trx_commit(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
-    pthread_mutex_lock(&lock_latch);
-
     log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
-
     log_force();
 
+    pthread_mutex_lock(&lock_latch);
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
     while (lock_obj != NULL) {
@@ -56,19 +54,17 @@ int trx_commit(int trx_id) {
     }
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-
     pthread_mutex_unlock(&lock_latch);
+
     return trx_id;
 }
 
 int trx_abort(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
     trx_rollback(trx_id);
-
-    pthread_mutex_lock(&lock_latch);
-
     log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 
+    pthread_mutex_lock(&lock_latch);
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
     while (lock_obj != NULL) {
@@ -79,8 +75,8 @@ int trx_abort(int trx_id) {
     }
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-
     pthread_mutex_unlock(&lock_latch);
+
     return trx_id;
 }
 
@@ -159,9 +155,8 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     //     lock_obj = lock_obj->next_lock;
     // }
     // if (lock_obj == NULL) {
-    //     // page_t* p;
     //     pthread_mutex_lock(&trx_latch);
-    //     int impl_trx_id = p->slots[idx].trx_id;
+    //     int impl_trx_id = (*p)->slots[idx].trx_id;
     //     if (trx_is_active(impl_trx_id)) {
     //         if (impl_trx_id == trx_id) {
     //             pthread_mutex_unlock(&trx_latch);
@@ -170,8 +165,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     //         }
     //         lock_alloc(table_id, page_num, idx, impl_trx_id, EXCLUSIVE);
     //     } else if (lock_mode == EXCLUSIVE) {
-    //         p->slots[idx].trx_id = trx_id;
-    //         buffer_dirty_page(table_id, page_num);
+    //         (*p)->slots[idx].trx_id = trx_id;
     //         pthread_mutex_unlock(&trx_latch);
     //         pthread_mutex_unlock(&lock_latch);
     //         return 0;
@@ -220,10 +214,10 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             }
             buffer_unpin_page(table_id, page_num);
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-    pthread_mutex_unlock(&lock_latch);
-            buffer_read_page(table_id, page_num, p);
-    pthread_mutex_lock(&lock_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
+            pthread_mutex_unlock(&lock_latch);
+            buffer_read_page(table_id, page_num, p);
+            pthread_mutex_lock(&lock_latch);
             cur_obj = lock_entry->head;
         } else {
             cur_obj = cur_obj->next_lock;
