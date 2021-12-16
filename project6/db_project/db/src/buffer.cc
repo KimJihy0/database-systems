@@ -69,11 +69,10 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
             buffers[buffer_idx]->page_num = page_num;
             file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         }
-        pthread_mutex_unlock(&buffer_latch);
+        // pthread_mutex_unlock(&buffer_latch);
         pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
-        pthread_mutex_lock(&buffer_latch);
+        // pthread_mutex_lock(&buffer_latch);
     } else {
-        pthread_mutex_lock(&buffer_latch);
         buffer_t* victim;
         for (victim = buffers[buffer_get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
             if (pthread_mutex_trylock(&(victim->page_latch)) != EBUSY) break;
