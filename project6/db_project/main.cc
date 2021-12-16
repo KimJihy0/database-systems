@@ -6,15 +6,15 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (10000)
+#define NUM_KEYS    (50)
 #define NUM_BUFS    (1000)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (16)
+#define UPDATE_THREADS_NUMBER   (100)
 #define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (1000000)
+#define UPDATE_COUNT            (5)
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
@@ -29,8 +29,9 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
+        // keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
+        keys[i] = (rand() % 2) * 29 + rand() % 2;
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -49,8 +50,9 @@ void* search_thread_func(void* arg) {
     uint16_t old_size;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        keys[i] = rand() % NUM_KEYS;
+        // keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
+        keys[i] = (rand() % 2) * 29 + rand() % 2;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
@@ -68,17 +70,17 @@ int main() {
     pthread_t update_threads[UPDATE_THREADS_NUMBER];
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
 
+    int64_t table_id;
+
     srand(time(__null));
 
     char pathname[256];
     sprintf(pathname, "DATA%d", NUM_KEYS);
 
-    // create_db(pathname, NUM_KEYS);
+    // table_id = create_db(pathname, NUM_KEYS);
     // return 0;
 
     init_db(NUM_BUFS, 0, 0, (char*)"logfile.data", (char*)"logmsg.txt");
-
-    int64_t table_id;
 
     table_id = open_table(pathname);
 
