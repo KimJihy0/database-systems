@@ -210,6 +210,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
             trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
             if (detect_deadlock(trx_id) == trx_id) {
+                buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
                 return -1;
             }
