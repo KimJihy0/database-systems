@@ -31,7 +31,7 @@ int init_log(char* log_path) {
     fprintf(logfile_fp, "log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size, old_image, new_image, next_undo_LSN\n");
     #endif
 
-    logbuffer_size = 10000;
+    logbuffer_size = 100000;
     logbuffer = new char[logbuffer_size];
     log_fd = open(log_path, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (log_fd < 0)
