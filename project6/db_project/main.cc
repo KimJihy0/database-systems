@@ -94,8 +94,8 @@ int main() {
 
     print_pgnum(table_id, 2559);
     print_pgnum(table_id, 2558);
-    // shutdown_db();
-    // return 0;
+    shutdown_db();
+    return 0;
 
     signal(SIGINT, handler);
     signal(SIGSEGV, handler);
