@@ -69,9 +69,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
             buffers[buffer_idx]->page_num = page_num;
             file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         }
-        // pthread_mutex_unlock(&buffer_latch);
         pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
-        // pthread_mutex_lock(&buffer_latch);
     } else {
         buffer_t* victim;
         for (victim = buffers[buffer_get_first_LRU_idx()]; victim; victim = victim->next_LRU) {
@@ -79,7 +77,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         }
         buffer_idx = buffer_get_buffer_idx(victim->table_id, victim->page_num);
         if (buffers[buffer_idx]->is_dirty != 0) {
-            log_force();
+            // log_force();
             file_write_page(buffers[buffer_idx]->table_id,
                             buffers[buffer_idx]->page_num,
                             &(buffers[buffer_idx]->frame));
