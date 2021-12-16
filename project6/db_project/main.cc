@@ -92,10 +92,10 @@ int main() {
 
     table_id = open_table(pathname);
 
-    // print_pgnum(table_id, 2559);
-    // print_pgnum(table_id, 2558);
-    // shutdown_db();
-    // return 0;
+    print_pgnum(table_id, 2559);
+    print_pgnum(table_id, 2558);
+    shutdown_db();
+    return 0;
 
     signal(SIGINT, handler);
     signal(SIGSEGV, handler);
