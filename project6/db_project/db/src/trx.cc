@@ -39,7 +39,7 @@ int trx_begin() {
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
                             #endif
 
-    // int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
+    int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
@@ -47,7 +47,7 @@ int trx_begin() {
                             printf("\t\t\t\t\ttrx_begin(%d) end\n", trx_id);
                             #endif
 
-    // trx_table[trx_id]->last_LSN = ret_LSN;
+    trx_table[trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&lock_latch);
     pthread_mutex_unlock(&trx_latch);
     return ret_trx_id;
@@ -59,14 +59,14 @@ int trx_commit(int trx_id) {
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
 
-    // log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
+    log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_commit(%d) start\n", trx_id);
                             #endif
 
-    // log_force();
+    log_force();
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
     while (lock_obj != NULL) {
@@ -93,8 +93,8 @@ int trx_abort(int trx_id) {
     #endif
 
     if (!trx_is_active(trx_id)) return 0;
-    // trx_rollback(trx_id);
-    // log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
+    trx_rollback(trx_id);
+    log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
@@ -323,16 +323,6 @@ int detect_deadlock(int trx_id) {
     } while (trx_is_active(trx_id) && !visit[trx_id]);
     return trx_id;
 }
-
-// int detect_deadlock(int trx_id) {
-//     std::unordered_map<int, int> visit;
-//     int i = trx_id;
-//     do {
-//         visit[i] = 1;
-//         i = trx_table[i]->waits_for_trx_id;
-//     } while (trx_is_active(i) && !visit[i]);
-//     return i;
-// }
 
 int lock_release(lock_t* lock_obj) {
     lock_entry_t* lock_entry = lock_obj->sentinel;
