@@ -84,7 +84,7 @@ int db_update(int64_t table_id, int64_t key,
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE, &p) != 0) {
         buffer_unpin_page(table_id, p_pgnum);   
-        trx_abort(trx_id);
+        trx_abort(trx_id); 
         return trx_id;
     }
 
