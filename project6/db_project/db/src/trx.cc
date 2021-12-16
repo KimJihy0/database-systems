@@ -60,13 +60,13 @@ int trx_commit(int trx_id) {
     #endif
 
     log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
+    log_force();
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_commit(%d) start\n", trx_id);
                             #endif
 
-    log_force();
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
     while (lock_obj != NULL) {
