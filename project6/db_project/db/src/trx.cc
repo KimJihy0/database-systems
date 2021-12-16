@@ -34,7 +34,7 @@ static void handler(int signo) {
         if (flag == 0) raise(SIGSEGV);
         else raise(1);
     }
-} 
+}
 
 int trx_begin() {
     pthread_mutex_lock(&trx_latch);
