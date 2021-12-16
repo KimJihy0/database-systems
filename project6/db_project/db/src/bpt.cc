@@ -47,9 +47,8 @@ int db_find(int64_t table_id, int64_t key,
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED, &p) != 0) {
-        raise(1);
-        buffer_unpin_page(table_id, p_pgnum);
         trx_abort(trx_id);
+        buffer_unpin_page(table_id, p_pgnum);
         return trx_id;
     }
 
@@ -85,9 +84,8 @@ int db_update(int64_t table_id, int64_t key,
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE, &p) != 0) {
-        raise(1);
-        buffer_unpin_page(table_id, p_pgnum);   
         trx_abort(trx_id);
+        buffer_unpin_page(table_id, p_pgnum);   
         return trx_id;
     }
 
