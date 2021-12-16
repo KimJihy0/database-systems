@@ -96,7 +96,7 @@ int db_update(int64_t table_id, int64_t key,
                                      table_id, p_pgnum, offset, size, (char*)p + offset, value);
     trx_set_last_LSN(trx_id, ret_LSN);
 
-    memcpy((char*)p + offset, value, size);
+    memcpy((char*)p + offset, value, new_val_size);
     p->page_LSN = ret_LSN;
     buffer_write_page(table_id, p_pgnum);
 
