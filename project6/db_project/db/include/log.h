@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define LOGBUF_SIZE 10000
+#define LOGBUF_SIZE 4096
 
 #define BEGIN       0
 #define UPDATE      1
@@ -16,8 +16,8 @@
 #define next_undo_LSN(log)    ((log)->trailer + 2 * (log)->size)
 
 #ifndef ERR_SYS
-#define ERR_SYS(s) ({ perror((s)); exit(1); })
-// #define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
+// #define ERR_SYS(s) ({ perror((s)); exit(1); })
+#define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
 #endif
 
 typedef uint64_t pagenum_t;

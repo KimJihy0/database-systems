@@ -14,8 +14,8 @@
 #define UPDATE_THREADS_NUMBER   (8)
 #define SEARCH_THREADS_NUMBER   (1)
 
-#define UPDATE_COUNT            (50)
-#define SEARCH_COUNT            (50)
+#define UPDATE_COUNT            (2500000)
+#define SEARCH_COUNT            (2500000)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname, int num_keys = NUM_KEYS);
@@ -82,10 +82,10 @@ int main() {
 
     table_id = open_table(pathname);
 
-    print_pgnum(table_id, 2559);
-    print_pgnum(table_id, 2558);
-    shutdown_db();
-    return 0;
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2558);
+    // shutdown_db();
+    // return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, 0);

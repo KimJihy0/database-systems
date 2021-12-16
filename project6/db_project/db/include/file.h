@@ -9,8 +9,8 @@
 #define NUM_BUCKETS         31
 
 #ifndef ERR_SYS
-#define ERR_SYS(s) ({ perror((s)); exit(1); })
-// #define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
+// #define ERR_SYS(s) ({ perror((s)); exit(1); })
+#define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
 #endif
 
 typedef uint64_t pagenum_t;
