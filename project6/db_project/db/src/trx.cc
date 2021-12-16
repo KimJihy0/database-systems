@@ -9,6 +9,9 @@ static std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash
 static std::unordered_map<int, trx_entry_t*> trx_table;
 int trx_id;
 
+sigset_t newmask, oldmask;
+int flag;
+
 int init_lock_table() {
     if (pthread_mutex_init(&lock_latch, 0) != 0)
         return -1;
@@ -26,16 +29,23 @@ int shutdown_lock_table() {
     return 0;
 }
 
+static void handler(int signo) {
+    if (signo == SIGSEGV) {
+        if (flag == 0) raise(SIGSEGV);
+        else raise(1);
+    }
+}
+
 int trx_begin() {
     pthread_mutex_lock(&trx_latch);
-    int local_trx_id = ++trx_id;
+    int ret_trx_id = ++trx_id;
     // int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
     // trx_table[trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&trx_latch);
-    return local_trx_id;
+    return ret_trx_id;
 }
 
 int trx_commit(int trx_id) {
@@ -203,6 +213,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     // lock allocation
     lock_obj = lock_alloc(table_id, page_num, idx, trx_id, lock_mode);
 
+    flag = 1;
+    signal(SIGSEGV, handler);
+
     // conflict & deadlock detection
     lock_t* cur_obj = lock_entry->head;
     while (cur_obj != lock_obj) {
@@ -212,6 +225,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             if (detect_deadlock(trx_id) == trx_id) {
                 buffer_unpin_page(table_id, page_num);      /*---------------------------------------*/
                 pthread_mutex_unlock(&lock_latch);
+                flag = 0;
                 return -1;
             }
             buffer_unpin_page(table_id, page_num);
@@ -225,6 +239,8 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             cur_obj = cur_obj->next_lock;
         }
     }
+
+    flag = 0;
 
     pthread_mutex_unlock(&lock_latch);
     return 0;

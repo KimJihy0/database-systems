@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include <signal.h>
+
 #define PAGE_SIZE           (4 * 1024)
 #define INITIAL_FILESIZE    (10 * 1024 * 1024)
 #define INITIAL_PAGENUM     (INITIAL_FILESIZE / PAGE_SIZE)
