@@ -37,9 +37,9 @@ void* update_thread_func(void* arg) {
     for (int i = 0; i < UPDATE_COUNT; i++)
         db_update(NUM_KEYS, keys[i], (char*)value.c_str(), 2, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
-        printf("Update thread is done(commit).(%s)\n", (char*)value.c_str());
+        printf("Update thread is done(T%d commit).(%s)\n", trx_id, (char*)value.c_str());
     else
-        printf("Update thread is done(abort).(%s)\n", (char*)value.c_str());
+        printf("Update thread is done(T%d abort).(%s)\n", trx_id, (char*)value.c_str());
 
     return nullptr;
 }
@@ -58,11 +58,19 @@ void* search_thread_func(void* arg) {
     for (int i = 0; i < SEARCH_COUNT; i++)
         db_find(NUM_KEYS, keys[i], ret_val, &old_size, trx_id);
     if (trx_commit(trx_id) == trx_id)
-        printf("Search thread is done(commit).\n");
+        printf("Search thread is done(T%d commit).\n", trx_id);
     else
-        printf("Search thread is done(abort).\n");
+        printf("Search thread is done(T%d abort).\n", trx_id);
 
     return nullptr;
+}
+
+static void handler(int signum) {
+    printf("signum: %d\n", signum);
+    print_locks(NULL);
+    print_waits_for_graph(UPDATE_THREADS_NUMBER + SEARCH_THREADS_NUMBER);
+    raise(signum);
+    exit(1);
 }
 
 #if 1
@@ -88,6 +96,9 @@ int main() {
     // print_pgnum(table_id, 2558);
     // shutdown_db();
     // return 0;
+
+    signal(SIGINT, handler);
+    signal(SIGSEGV, handler);
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, 0);

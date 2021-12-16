@@ -3,18 +3,12 @@
 #include <unordered_map>
 #include <string.h>
 
-#define verbose 0
-
 static pthread_mutex_t lock_latch;
 static pthread_mutex_t trx_latch;
 static std::unordered_map<std::pair<int64_t, pagenum_t>, lock_entry_t, pair_hash> lock_table;
 static std::unordered_map<int, trx_entry_t*> trx_table;
 int trx_id;
 
-#if verbose
-void print_waits_for_graph();
-void* print_locks(void* args);
-#endif
 
 int init_lock_table() {
     if (pthread_mutex_init(&lock_latch, 0) != 0)
@@ -39,6 +33,7 @@ int trx_begin() {
     #endif
 
     pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&lock_latch);
     int ret_trx_id = ++trx_id;
                             #if verbose
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
@@ -53,6 +48,7 @@ int trx_begin() {
                             #endif
 
     // trx_table[trx_id]->last_LSN = ret_LSN;
+    pthread_mutex_unlock(&lock_latch);
     pthread_mutex_unlock(&trx_latch);
     return ret_trx_id;
 }
@@ -321,11 +317,14 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
 
 int detect_deadlock(int trx_id) {
     std::unordered_map<int, int> visit;
+    int i = trx_id;
+    // pthread_mutex_lock(&trx_latch);
     do {
-        visit[trx_id] = 1;
-        trx_id = trx_table[trx_id]->waits_for_trx_id;
-    } while (trx_is_active(trx_id) && !visit[trx_id]);
-    return trx_id;
+        visit[i] = 1;
+        i = trx_table[i]->waits_for_trx_id;
+    } while (trx_is_active(i) && !visit[i]);
+    // pthread_mutex_unlock(&trx_latch);
+    return i;
 }
 
 int lock_release(lock_t* lock_obj) {
@@ -345,14 +344,13 @@ int lock_release(lock_t* lock_obj) {
     return 0;
 }
 
-#if verbose
-void print_waits_for_graph() {
+void print_waits_for_graph(int num) {
     char c;
-    for (int i = 1; i <= 8; i++) {
+    for (int i = 1; i <= num; i++) {
         printf("\t%d->%d ", i, trx_table[i] ? trx_table[i]->waits_for_trx_id : -1);
     }
     printf("\n");
-    for (int i = 1; i <= 8; i++) {
+    for (int i = 1; i <= num; i++) {
         printf("\t%d: %c ", i, trx_is_active(i) ? 'A' : 'N');
     }
     printf("\n");
@@ -378,4 +376,3 @@ void* print_locks(void* args) {
     printf("\n");
     return NULL;
 }
-#endif
