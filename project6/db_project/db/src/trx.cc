@@ -34,22 +34,22 @@ int trx_begin() {
 
     pthread_mutex_lock(&trx_latch);
     int ret_trx_id = ++trx_id;
+    pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
                             #endif
 
-    int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
+    int64_t ret_LSN = log_write_log(0, ret_trx_id, BEGIN);
     pthread_mutex_lock(&lock_latch);
-    trx_table[trx_id] = new trx_entry_t;
-    trx_table[trx_id]->head = NULL;
-    trx_table[trx_id]->waits_for_trx_id = 0;
+    trx_table[ret_trx_id] = new trx_entry_t;
+    trx_table[ret_trx_id]->head = NULL;
+    trx_table[ret_trx_id]->waits_for_trx_id = 0;
                             #if verbose
-                            printf("\t\t\t\t\ttrx_begin(%d) end\n", trx_id);
+                            printf("\t\t\t\t\ttrx_begin(%d) end\n", ret_trx_id);
                             #endif
 
-    trx_table[trx_id]->last_LSN = ret_LSN;
+    trx_table[ret_trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&lock_latch);
-    pthread_mutex_unlock(&trx_latch);
     return ret_trx_id;
 }
 
