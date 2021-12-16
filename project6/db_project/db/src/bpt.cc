@@ -7,7 +7,7 @@ int init_db(int num_buf, int flag, int log_num, char* log_path, char* logmsg_pat
     if (init_log(log_path) != 0) return -1;
     if (init_buffer(num_buf) != 0) return -1;
     if (init_lock_table() != 0) return -1;
-    // recovery(flag, log_num, logmsg_path);
+    recovery(flag, log_num, logmsg_path);
     return 0;
 }
 
