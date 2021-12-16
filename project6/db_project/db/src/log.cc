@@ -174,10 +174,13 @@ void log_force() {
 
 /* ---To do.---
  * trx_entry에서 삭제한건데 왜 state가 필요한지.
+ * logbuffer_size 줄여보기
  * trx_state
  * get_last_LSN(), set_last_LSN() -> log_write_log로 넣어버리기
  * page_latch <-> lock_latch 데드락
  * recov.h, trx.h, log.h -> 소스코드로?
+ * assert 많이 넣어보기
+ * undo 순서 trx별로인지 시간순서대로인지 확인
 
  * 가변멤버 new delete 가능?
  * 8byte 4byte 확인 (next_undo_LSN)

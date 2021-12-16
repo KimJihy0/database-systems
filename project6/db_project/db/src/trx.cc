@@ -83,6 +83,7 @@ int trx_abort(int trx_id) {
 void trx_rollback(int trx_id) {
     page_t* undo_page;
     log_t* undo_log = (log_t*)malloc(300);
+    // log_t* undo_log = (log_t*)alloca(300);
     // log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     uint64_t undo_LSN = trx_table[trx_id]->last_LSN;
     while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
