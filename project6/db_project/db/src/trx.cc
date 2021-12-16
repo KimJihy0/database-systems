@@ -317,14 +317,11 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
 
 int detect_deadlock(int trx_id) {
     std::unordered_map<int, int> visit;
-    int i = trx_id;
-    // pthread_mutex_lock(&trx_latch);
     do {
-        visit[i] = 1;
-        i = trx_table[i]->waits_for_trx_id;
-    } while (trx_is_active(i) && !visit[i]);
-    // pthread_mutex_unlock(&trx_latch);
-    return i;
+        visit[trx_id] = 1;
+        trx_id = trx_table[trx_id]->waits_for_trx_id;
+    } while (trx_is_active(trx_id) && !visit[trx_id]);
+    return trx_id;
 }
 
 int lock_release(lock_t* lock_obj) {
