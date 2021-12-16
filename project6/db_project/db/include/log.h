@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define LOGBUFFER_SIZE 16384
+// #define LOGBUFFER_SIZE 16384
 
 #define BEGIN       0
 #define UPDATE      1
