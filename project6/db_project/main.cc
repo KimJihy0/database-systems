@@ -6,15 +6,15 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (50)
+#define NUM_KEYS    (10000)
 #define NUM_BUFS    (1000)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (8)
-#define SEARCH_THREADS_NUMBER   (1)
+#define UPDATE_THREADS_NUMBER   (16)
+#define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (50)
+#define UPDATE_COUNT            (1000000)
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
@@ -82,10 +82,10 @@ int main() {
 
     table_id = open_table(pathname);
 
-    print_pgnum(table_id, 2559);
-    print_pgnum(table_id, 2558);
-    shutdown_db();
-    return 0;
+    // print_pgnum(table_id, 2559);
+    // print_pgnum(table_id, 2558);
+    // shutdown_db();
+    // return 0;
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, 0);
