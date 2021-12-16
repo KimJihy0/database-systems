@@ -113,8 +113,6 @@ int main() {
     print_pgnum(table_id, 2559);
     print_pgnum(table_id, 2558);
 
-    // return 0;
-
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);
     return 0;
