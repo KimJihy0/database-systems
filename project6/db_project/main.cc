@@ -14,8 +14,8 @@
 #define UPDATE_THREADS_NUMBER   (8)
 #define SEARCH_THREADS_NUMBER   (1)
 
-#define UPDATE_COUNT            (2500000)
-#define SEARCH_COUNT            (2500000)
+#define UPDATE_COUNT            (1000000)
+#define SEARCH_COUNT            (1000000)
 
 std::string gen_rand_val(int size);
 int create_db(const char* pathname, int num_keys = NUM_KEYS);
@@ -29,8 +29,8 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        // keys[i] = rand() % NUM_KEYS;
-        keys[i] = i;
+        keys[i] = rand() % NUM_KEYS;
+        // keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -49,8 +49,8 @@ void* search_thread_func(void* arg) {
     uint16_t old_size;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        // keys[i] = rand() % NUM_KEYS;
-        keys[i] = i;
+        keys[i] = rand() % NUM_KEYS;
+        // keys[i] = i;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)

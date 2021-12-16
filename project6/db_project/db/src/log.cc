@@ -30,7 +30,7 @@ int init_log(char* log_path) {
     fprintf(logfile_fp, "log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size, old_image, new_image, next_undo_LSN\n");
     #endif
 
-    logbuffer = new char[LOGBUF_SIZE];
+    logbuffer = new char[LOGBUFFER_SIZE];
     log_fd = open(log_path, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (log_fd < 0)
         ERR_SYS("Failure to open log file(open error)");
@@ -155,7 +155,7 @@ uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type,
 }
 
 void log_consider_force(uint32_t log_size) {
-    if (log_tail + log_size >= LOGBUF_SIZE) {
+    if (log_tail + log_size >= LOGBUFFER_SIZE) {
         if (write(log_fd, logbuffer, log_tail) != log_tail)
             ERR_SYS("Failure to force log(write error)");
         flushed_LSN = LSN;
