@@ -74,6 +74,7 @@ int trx_commit(int trx_id) {
         del_obj = lock_obj;
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
+        del_obj = NULL;
     }
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
@@ -108,6 +109,7 @@ int trx_abort(int trx_id) {
         del_obj = lock_obj;
         lock_obj = lock_obj->trx_next_lock;
         delete del_obj;
+        del_obj = NULL;
     }
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
@@ -264,7 +266,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
                             print_locks(NULL);
                             #endif
 
-            if (detect_deadlock(trx_id) == trx_id) {
+            if (detect_deadlock(trx_id) != 0) {
                 buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
                 return -1;
