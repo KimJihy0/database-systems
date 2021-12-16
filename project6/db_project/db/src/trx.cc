@@ -29,21 +29,21 @@ int shutdown_lock_table() {
 int trx_begin() {
     pthread_mutex_lock(&trx_latch);
     int local_trx_id = ++trx_id;
-    int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
+    // int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
-    trx_table[trx_id]->last_LSN = ret_LSN;
+    // trx_table[trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&trx_latch);
     return local_trx_id;
 }
 
 int trx_commit(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
-    log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
+    // log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
 
     pthread_mutex_lock(&lock_latch);
-    log_force();
+    // log_force();
     lock_t* del_obj;
     lock_t* lock_obj = trx_table[trx_id]->head;
     while (lock_obj != NULL) {
@@ -61,8 +61,8 @@ int trx_commit(int trx_id) {
 
 int trx_abort(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
-    trx_rollback(trx_id);
-    log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
+    // trx_rollback(trx_id);
+    // log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 
     pthread_mutex_lock(&lock_latch);
     lock_t* del_obj;

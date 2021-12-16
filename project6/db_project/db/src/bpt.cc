@@ -92,12 +92,12 @@ int db_update(int64_t table_id, int64_t key,
     uint16_t size = p->slots[i].size;
     *old_val_size = size;
 
-    uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, UPDATE,
-                                     table_id, p_pgnum, offset, size, (char*)p + offset, value);
-    trx_set_last_LSN(trx_id, ret_LSN);
+    // uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, UPDATE,
+    //                                  table_id, p_pgnum, offset, size, (char*)p + offset, value);
+    // trx_set_last_LSN(trx_id, ret_LSN);
 
     memcpy((char*)p + offset, value, new_val_size);
-    p->page_LSN = ret_LSN;
+    // p->page_LSN = ret_LSN;
     buffer_write_page(table_id, p_pgnum);
 
     return 0;
