@@ -55,7 +55,6 @@ int buffer_get_buffer_idx(int64_t table_id, pagenum_t page_num) {
 }
 
 int buffer_request_page(int64_t table_id, pagenum_t page_num) {
-    start :
     pthread_mutex_lock(&buffer_latch);
 
     int buffer_idx = buffer_get_buffer_idx(table_id, page_num);
@@ -71,11 +70,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
             file_read_page(table_id, page_num, &(buffers[buffer_idx]->frame));
         }
         // pthread_mutex_unlock(&buffer_latch);
-        // pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
-        if (pthread_mutex_trylock(&(buffers[buffer_idx]->page_latch)) == EBUSY) {
-            pthread_mutex_unlock(&buffer_latch);
-            goto start;
-        }
+        pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
         // pthread_mutex_lock(&buffer_latch);
     } else {
         pthread_mutex_lock(&buffer_latch);
@@ -85,7 +80,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         }
         buffer_idx = buffer_get_buffer_idx(victim->table_id, victim->page_num);
         if (buffers[buffer_idx]->is_dirty != 0) {
-            log_force();
+            // log_force();
             file_write_page(buffers[buffer_idx]->table_id,
                             buffers[buffer_idx]->page_num,
                             &(buffers[buffer_idx]->frame));
