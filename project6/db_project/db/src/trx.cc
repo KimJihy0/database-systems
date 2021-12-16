@@ -39,7 +39,7 @@ int trx_begin() {
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
                             #endif
 
-    // int64_t ret_LSN = log_write_log(0, ret_trx_id, BEGIN);
+    int64_t ret_LSN = log_write_log(0, ret_trx_id, BEGIN);
     trx_table[ret_trx_id] = new trx_entry_t;
     trx_table[ret_trx_id]->head = NULL;
     trx_table[ret_trx_id]->waits_for_trx_id = 0;
@@ -47,7 +47,7 @@ int trx_begin() {
                             printf("\t\t\t\t\ttrx_begin(%d) end\n", ret_trx_id);
                             #endif
 
-    // trx_table[ret_trx_id]->last_LSN = ret_LSN;
+    trx_table[ret_trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&trx_latch);
     pthread_mutex_unlock(&lock_latch);
     return ret_trx_id;
@@ -59,8 +59,8 @@ int trx_commit(int trx_id) {
     printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
     #endif
 
-    // log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
-    // log_force();
+    log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
+    log_force();
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
@@ -94,8 +94,8 @@ int trx_abort(int trx_id) {
     #endif
     if (!trx_is_active(trx_id)) return 0;
 
-    // trx_rollback(trx_id);
-    // log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
+    trx_rollback(trx_id);
+    log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 
     pthread_mutex_lock(&lock_latch);
                             #if verbose
