@@ -32,8 +32,8 @@ int trx_begin() {
     printf("----------------------------------------------------------------------------------------trx_begin()\n");
     #endif
 
-    pthread_mutex_lock(&trx_latch);
     pthread_mutex_lock(&lock_latch);
+    pthread_mutex_lock(&trx_latch);
     int ret_trx_id = ++trx_id;
                             #if verbose
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
@@ -48,8 +48,8 @@ int trx_begin() {
                             #endif
 
     // trx_table[trx_id]->last_LSN = ret_LSN;
-    pthread_mutex_unlock(&lock_latch);
     pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&lock_latch);
     return ret_trx_id;
 }
 
