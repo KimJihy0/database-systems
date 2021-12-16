@@ -33,13 +33,13 @@ int trx_begin() {
     #endif
 
     pthread_mutex_lock(&trx_latch);
-    pthread_mutex_lock(&lock_latch);
     int ret_trx_id = ++trx_id;
                             #if verbose
                             printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
                             #endif
 
     int64_t ret_LSN = log_write_log(0, trx_id, BEGIN);
+    pthread_mutex_lock(&lock_latch);
     trx_table[trx_id] = new trx_entry_t;
     trx_table[trx_id]->head = NULL;
     trx_table[trx_id]->waits_for_trx_id = 0;
