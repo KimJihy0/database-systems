@@ -72,7 +72,7 @@ int buffer_request_page(int64_t table_id, pagenum_t page_num) {
         }
         // pthread_mutex_unlock(&buffer_latch);
         // pthread_mutex_lock(&(buffers[buffer_idx]->page_latch));
-        if (pthread_mutex_lock(&(buffers[buffer_idx]->page_latch)) == EBUSY) {
+        if (pthread_mutex_trylock(&(buffers[buffer_idx]->page_latch)) == EBUSY) {
             pthread_mutex_unlock(&buffer_latch);
             goto start;
         }
