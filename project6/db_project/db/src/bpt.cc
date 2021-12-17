@@ -7,7 +7,7 @@ int init_db(int num_buf, int flag, int log_num, char* log_path, char* logmsg_pat
     if (init_log(log_path) != 0) return -1;
     if (init_buffer(num_buf) != 0) return -1;
     if (init_lock_table() != 0) return -1;
-    // recovery(flag, log_num, logmsg_path);
+    recovery(flag, log_num, logmsg_path);
     return 0;
 }
 
@@ -47,7 +47,6 @@ int db_find(int64_t table_id, int64_t key,
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, SHARED, &p) != 0) {
-        // trx_abort(trx_id);
         return trx_id;
     }
 
@@ -83,7 +82,6 @@ int db_update(int64_t table_id, int64_t key,
         return -1;
     }
     if (lock_acquire(table_id, p_pgnum, i, trx_id, EXCLUSIVE, &p) != 0) {
-        // trx_abort(trx_id);
         return trx_id;
     }
 

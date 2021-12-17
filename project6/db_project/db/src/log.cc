@@ -184,6 +184,7 @@ void log_force() {
  * assert 많이 넣어보기
  * undo 순서 trx별로인지 시간순서대로인지 확인
  * abort unpin 순서
+ * find로 안찝찝하게 지우기
 
  * 가변멤버 new delete 가능?
  * 8byte 4byte 확인 (next_undo_LSN)

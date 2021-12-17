@@ -35,13 +35,15 @@ int trx_begin() {
     pthread_mutex_lock(&lock_latch);
     pthread_mutex_lock(&trx_latch);
     int ret_trx_id = ++trx_id;
+    pthread_mutex_unlock(&trx_latch);
     int64_t ret_LSN = log_write_log(0, ret_trx_id, BEGIN);
+    pthread_mutex_lock(&trx_latch);
     trx_table[ret_trx_id] = new trx_entry_t;
     trx_table[ret_trx_id]->head = NULL;
     trx_table[ret_trx_id]->waits_for_trx_id = 0;
     trx_table[ret_trx_id]->last_LSN = ret_LSN;
-    pthread_mutex_unlock(&lock_latch);
     pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&lock_latch);
     return ret_trx_id;
 }
 
@@ -86,10 +88,6 @@ int trx_abort(int trx_id) {
     log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
 
     pthread_mutex_lock(&lock_latch);
-                            #if verbose
-                            printf("\t\t\t\t\ttrx_abort(%d) start\n", trx_id);
-                            #endif
-
     lock_t* del_obj;
     pthread_mutex_lock(&trx_latch);
     lock_t* lock_obj = trx_table[trx_id]->head;
@@ -105,10 +103,6 @@ int trx_abort(int trx_id) {
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
     pthread_mutex_unlock(&trx_latch);
-                            #if verbose
-                            printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
-                            #endif
-
     pthread_mutex_unlock(&lock_latch);
 
     return trx_id;
@@ -176,16 +170,7 @@ void trx_remove_entry(int trx_id) {
 }
 
 int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode, page_t** p) {
-                            #if verbose
-                            printf("\t\t\t\t\tlock_acquire(%ld, %d, %c, %d)\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
-                            #endif
-
     pthread_mutex_lock(&lock_latch);
-                            #if verbose
-                            printf("lock_acquire(%ld, %d, %c, T%d) lock\n", page_num, idx, lock_mode ? 'X' : 'S', trx_id);
-                            #endif
-
-
     lock_entry_t* lock_entry = &(lock_table[{table_id, page_num}]);
     lock_t* lock_obj;
 
@@ -260,16 +245,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     while (cur_obj != lock_obj) {
         if (GET_BIT(cur_obj->bitmap, idx) != 0 && cur_obj->owner_trx_id != trx_id &&
             (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
-    pthread_mutex_lock(&trx_latch);
+            pthread_mutex_lock(&trx_latch);
             trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
-    pthread_mutex_unlock(&trx_latch);
-                            #if verbose
-                            if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %d)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, idx);
-                            else printf("trx %d waits for trx %d to read (%ld, %d)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, idx);
-                            print_waits_for_graph();
-                            print_locks(NULL);
-                            #endif
-
+            pthread_mutex_unlock(&trx_latch);
             if (detect_deadlock(trx_id) != 0) {
                 buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
@@ -278,16 +256,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             }
             buffer_unpin_page(table_id, page_num);
             pthread_cond_wait(&(cur_obj->cond_var), &lock_latch);
-                                #if verbose
-                                if (lock_mode) printf("trx %d wakes up trx %d to write (%ld, %d)\n", trx_table[trx_id]->waits_for_trx_id, trx_id, page_num, idx);
-                                else printf("trx %d wakes up trx %d to read (%ld, %d)\n", trx_table[trx_id]->waits_for_trx_id, trx_id, page_num, idx);
-                                print_waits_for_graph();
-                                print_locks(NULL);
-                                #endif
-
-    pthread_mutex_lock(&trx_latch);
+            pthread_mutex_lock(&trx_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
-    pthread_mutex_unlock(&trx_latch);
+            pthread_mutex_unlock(&trx_latch);
             pthread_mutex_unlock(&lock_latch);
             buffer_read_page(table_id, page_num, p);
             pthread_mutex_lock(&lock_latch);
@@ -335,7 +306,6 @@ int detect_deadlock(int trx_id) {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
     } while ((trx_table[trx_id] != NULL) && !visit[trx_id]);
-    // } while (trx_is_active(trx_id) && !visit[trx_id]);
     pthread_mutex_unlock(&trx_latch);
     return trx_id;
 }
