@@ -326,7 +326,8 @@ int detect_deadlock(int trx_id) {
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
-    } while (trx_is_active(trx_id) && !visit[trx_id]);
+    } while ((trx_table[trx_id] != NULL) && !visit[trx_id]);
+    // } while (trx_is_active(trx_id) && !visit[trx_id]);
     return trx_id;
 }
 
