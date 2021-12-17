@@ -248,7 +248,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             pthread_mutex_lock(&trx_latch);
             trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
             pthread_mutex_unlock(&trx_latch);
-            if (detect_deadlock(trx_id) != 0) {
+            if (detect_deadlock(trx_id) == trx_id) {
                 buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
                 trx_abort(trx_id);
