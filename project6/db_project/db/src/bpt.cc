@@ -88,7 +88,7 @@ int db_update(int64_t table_id, int64_t key,
         return trx_id;
     }
 
-    if (p == NULL) raise(1);
+    if (p == NULL) raise(1); 
     uint16_t offset = p->slots[i].offset;
     uint16_t size = p->slots[i].size;
     *old_val_size = size;
