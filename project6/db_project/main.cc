@@ -14,7 +14,7 @@
 #define UPDATE_THREADS_NUMBER   (100)
 #define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (5)
+#define UPDATE_COUNT            (50)
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);
@@ -29,9 +29,9 @@ void* update_thread_func(void* arg) {
     std::string value = gen_rand_val(2);
 
     for (int i = 0; i < UPDATE_COUNT; i++)
-        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
-        keys[i] = (rand() % 2) * 29 + rand() % 2;
+        // keys[i] = (rand() % 2) * 29 + rand() % 2;
 
     int trx_id = trx_begin();
     for (int i = 0; i < UPDATE_COUNT; i++)
@@ -50,9 +50,9 @@ void* search_thread_func(void* arg) {
     uint16_t old_size;
 
     for (int i = 0; i < SEARCH_COUNT; i++)
-        // keys[i] = rand() % NUM_KEYS;
+        keys[i] = rand() % NUM_KEYS;
         // keys[i] = i;
-        keys[i] = (rand() % 2) * 29 + rand() % 2;
+        // keys[i] = (rand() % 2) * 29 + rand() % 2;
 
     int trx_id = trx_begin();
     for (int i = 0; i < SEARCH_COUNT; i++)
