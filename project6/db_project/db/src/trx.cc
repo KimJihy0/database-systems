@@ -81,6 +81,7 @@ int trx_commit(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
+    trx_table.erase(trx_id);
     pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
@@ -120,6 +121,7 @@ int trx_abort(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
+    trx_table.erase(trx_id);
     pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
