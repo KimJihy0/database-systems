@@ -325,7 +325,7 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
         lock_entry->tail->next_lock = lock_obj;
     lock_entry->tail = lock_obj;
     trx_table[trx_id]->head = lock_obj;
-// 
+
     return lock_obj;
 }
 
