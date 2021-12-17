@@ -137,7 +137,9 @@ void trx_rollback(int trx_id) {
     log_t* undo_log = (log_t*)malloc(300);
     // log_t* undo_log = (log_t*)alloca(300);
     // log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
+    pthread_mutex_lock(&trx_latch);
     uint64_t undo_LSN = trx_table[trx_id]->last_LSN;
+    pthread_mutex_unlock(&trx_latch);
     while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
         uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, COMPENSATE,
                 undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
@@ -170,11 +172,16 @@ int trx_is_active(int trx_id) {
 }
 
 uint64_t trx_get_last_LSN(int trx_id) {
-    return trx_table[trx_id]->last_LSN;
+    pthread_mutex_lock(&trx_latch);
+    uint64_t last_LSN = trx_table[trx_id]->last_LSN;
+    pthread_mutex_unlock(&trx_latch);
+    return last_LSN;
 }
 
 void trx_set_last_LSN(int trx_id, uint64_t last_LSN) {
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->last_LSN = last_LSN;
+    pthread_mutex_unlock(&trx_latch);
 }
 
 void trx_resurrect_entry(int trx_id) {
@@ -271,7 +278,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     while (cur_obj != lock_obj) {
         if (GET_BIT(cur_obj->bitmap, idx) != 0 && cur_obj->owner_trx_id != trx_id &&
             (cur_obj->lock_mode == EXCLUSIVE || lock_mode == EXCLUSIVE)) {
+    pthread_mutex_lock(&trx_latch);
             trx_table[trx_id]->waits_for_trx_id = cur_obj->owner_trx_id;
+    pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             if (lock_mode) printf("trx %d waits for trx %d to write (%ld, %d)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, idx);
                             else printf("trx %d waits for trx %d to read (%ld, %d)\n", trx_id, trx_table[trx_id]->waits_for_trx_id, page_num, idx);
@@ -294,7 +303,9 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
                                 print_locks(NULL);
                                 #endif
 
+    pthread_mutex_lock(&trx_latch);
             trx_table[trx_id]->waits_for_trx_id = 0;
+    pthread_mutex_unlock(&trx_latch);
             pthread_mutex_unlock(&lock_latch);
             buffer_read_page(table_id, page_num, p);
             pthread_mutex_lock(&lock_latch);
@@ -316,7 +327,9 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
     lock_obj->next_lock = NULL;
     lock_obj->sentinel = lock_entry;
     lock_obj->cond_var = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_lock(&trx_latch);
     lock_obj->trx_next_lock = trx_table[trx_id]->head;
+    pthread_mutex_unlock(&trx_latch);
     lock_obj->lock_mode = lock_mode;
     lock_obj->owner_trx_id = trx_id;
     lock_obj->bitmap = INIT_BIT(idx);
@@ -326,18 +339,22 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
     else
         lock_entry->tail->next_lock = lock_obj;
     lock_entry->tail = lock_obj;
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->head = lock_obj;
+    pthread_mutex_unlock(&trx_latch);
 
     return lock_obj;
 }
 
 int detect_deadlock(int trx_id) {
     std::unordered_map<int, int> visit;
+    pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
     } while ((trx_table[trx_id] != NULL) && !visit[trx_id]);
     // } while (trx_is_active(trx_id) && !visit[trx_id]);
+    pthread_mutex_unlock(&trx_latch);
     return trx_id;
 }
 
