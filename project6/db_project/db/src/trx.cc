@@ -123,6 +123,7 @@ int trx_abort(int trx_id) {
 }
 
 void trx_rollback(int trx_id) {
+    pthread_mutex_lock(&lock_latch);
     page_t* undo_page;
     log_t* undo_log = (log_t*)malloc(300);
     // log_t* undo_log = (log_t*)alloca(300);
@@ -142,6 +143,7 @@ void trx_rollback(int trx_id) {
         undo_LSN = undo_log->prev_LSN;
     }
     free(undo_log);
+    pthread_mutex_unlock(&lock_latch);
 }
 
 int trx_get_trx_id() {
