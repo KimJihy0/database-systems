@@ -153,7 +153,10 @@ void trx_set_trx_id(int set_trx_id) {
 }
 
 int trx_is_active(int trx_id) {
-    return trx_table[trx_id] != NULL;
+    pthread_mutex_lock(&lock_latch);
+    int ret_val = (trx_table[trx_id] != NULL);
+    pthread_mutex_unlock(&lock_latch);
+    return ret_val;
 }
 
 uint64_t trx_get_last_LSN(int trx_id) {

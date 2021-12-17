@@ -97,8 +97,8 @@ int main() {
     // shutdown_db();
     // return 0;
 
-    signal(SIGINT, handler);
-    signal(SIGSEGV, handler);
+    // signal(SIGINT, handler);
+    // signal(SIGSEGV, handler);
 
     for (int i = 0; i < UPDATE_THREADS_NUMBER; i++)
         pthread_create(&update_threads[i], 0, update_thread_func, 0);

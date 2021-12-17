@@ -90,11 +90,6 @@ int db_update(int64_t table_id, int64_t key,
     uint16_t offset = p->slots[i].offset;
     uint16_t size = p->slots[i].size;
     *old_val_size = size;
-    if (offset > 4096) raise(2);
-    if (size > 108) raise(3);
-    if (size < 46) raise(4);
-    if (new_val_size > 108) raise(5);
-    if (new_val_size < 46) raise(6);
 
     uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, UPDATE,
                                      table_id, p_pgnum, offset, size, (char*)p + offset, value);
