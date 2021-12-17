@@ -76,10 +76,8 @@ int trx_commit(int trx_id) {
         delete del_obj;
         del_obj = NULL;
     }
-    pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-    pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
                             printf("\t\t\t\t\ttrx_commit(%d) end\n", trx_id);
@@ -113,10 +111,8 @@ int trx_abort(int trx_id) {
         delete del_obj;
         del_obj = NULL;
     }
-    pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-    pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
                             #endif
