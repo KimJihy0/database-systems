@@ -89,7 +89,7 @@ int trx_commit(int trx_id) {
                             #endif
 
     pthread_mutex_unlock(&lock_latch);
-// 
+
     return trx_id;
 }
 
