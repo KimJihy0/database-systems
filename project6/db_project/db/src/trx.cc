@@ -35,18 +35,10 @@ int trx_begin() {
     pthread_mutex_lock(&lock_latch);
     pthread_mutex_lock(&trx_latch);
     int ret_trx_id = ++trx_id;
-                            #if verbose
-                            printf("\t\t\t\t\ttrx_begin(%d) start\n", trx_id);
-                            #endif
-
     int64_t ret_LSN = log_write_log(0, ret_trx_id, BEGIN);
     trx_table[ret_trx_id] = new trx_entry_t;
     trx_table[ret_trx_id]->head = NULL;
     trx_table[ret_trx_id]->waits_for_trx_id = 0;
-                            #if verbose
-                            printf("\t\t\t\t\ttrx_begin(%d) end\n", ret_trx_id);
-                            #endif
-
     trx_table[ret_trx_id]->last_LSN = ret_LSN;
     pthread_mutex_unlock(&lock_latch);
     pthread_mutex_unlock(&trx_latch);
@@ -55,18 +47,10 @@ int trx_begin() {
 
 int trx_commit(int trx_id) {
     if (!trx_is_active(trx_id)) return 0;
-    #if verbose
-    printf("----------------------------------------------------------------------------------------trx_commit(%d)\n", trx_id);
-    #endif
-
     log_write_log(trx_get_last_LSN(trx_id), trx_id, COMMIT);
     log_force();
 
     pthread_mutex_lock(&lock_latch);
-                            #if verbose
-                            printf("\t\t\t\t\ttrx_commit(%d) start\n", trx_id);
-                            #endif
-
     lock_t* del_obj;
     pthread_mutex_lock(&trx_latch);
     lock_t* lock_obj = trx_table[trx_id]->head;
@@ -81,7 +65,6 @@ int trx_commit(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-    trx_table.erase(trx_id);
     pthread_mutex_unlock(&trx_latch);
 
                             #if verbose
@@ -121,7 +104,6 @@ int trx_abort(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     delete trx_table[trx_id];
     trx_table[trx_id] = NULL;
-    trx_table.erase(trx_id);
     pthread_mutex_unlock(&trx_latch);
                             #if verbose
                             printf("\t\t\t\t\ttrx_abort(%d) end\n", trx_id);
