@@ -269,6 +269,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             if (detect_deadlock(trx_id) != 0) {
                 buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
+                trx_abort(trx_id);
                 return -1;
             }
             buffer_unpin_page(table_id, page_num);
