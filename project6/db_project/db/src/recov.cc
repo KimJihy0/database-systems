@@ -147,6 +147,10 @@ int undo_pass(FILE* fp, int log_num) {
             }
         }
         log_read_log(undo_LSN, undo_log);
+        if (count-- == 0) {
+            free(undo_log);
+            return 1;
+        }
         if (undo_log->type == UPDATE || undo_log->type == COMPENSATE) {
             uint64_t ret_LSN = log_write_log(trx_get_last_LSN(undo_trx_id), undo_trx_id, COMPENSATE,
                     undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
