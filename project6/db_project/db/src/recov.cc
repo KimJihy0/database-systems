@@ -163,8 +163,9 @@ int undo_pass(FILE* fp, int log_num) {
             buffer_write_page(undo_log->table_id, undo_log->page_num);
 
             fprintf(fp, "LSN %lu [UPDATE] Transaction id %d undo apply\n", undo_log->LSN, undo_log->trx_id);
-            to_undo.insert(undo_log->type == UPDATE ?
-                           undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size));
+            // to_undo.insert(undo_log->type == UPDATE ?
+            //                undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size));
+            to_undo.insert(undo_log->prev_LSN);
         }
         else {
             log_write_log(trx_get_last_LSN(undo_trx_id), undo_trx_id, ROLLBACK);

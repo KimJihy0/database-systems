@@ -80,7 +80,7 @@ int main() {
 
     int64_t table_id;
 
-    // srand(time(__null));
+    srand(time(__null));
 
     char pathname[256];
     sprintf(pathname, "DATA%d", NUM_KEYS);
