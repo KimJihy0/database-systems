@@ -138,7 +138,7 @@ int undo_pass(FILE* fp, int log_num) {
         to_undo.insert(trx_get_last_LSN(loser));
     }
     while (!to_undo.empty()) {
-        raise(1);
+        // raise(1);
         undo_LSN = *std::max_element(to_undo.begin(), to_undo.end());
         to_undo.erase(undo_LSN);
         for (const auto& loser : losers) {

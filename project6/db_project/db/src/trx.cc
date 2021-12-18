@@ -82,7 +82,12 @@ int trx_abort(int trx_id) {
     #if verbose
     printf("----------------------------------------------------------------------------------------trx_abort(%d)\n", trx_id);
     #endif
-    if (!trx_is_active(trx_id)) return 0;
+    if (!trx_is_active(trx_id)) {
+        raise(3);
+        return 0;
+    }
+
+    raise(2);
 
     trx_rollback(trx_id);
     log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
