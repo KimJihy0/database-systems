@@ -6,8 +6,8 @@
 #include <vector>
 #include <time.h>
 
-#define NUM_KEYS    (50)
-#define NUM_BUFS    (1000)
+#define NUM_KEYS    (10000)
+#define NUM_BUFS    (8)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
