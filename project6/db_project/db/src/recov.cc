@@ -18,7 +18,7 @@ void recovery(int flag, int log_num, char* logmsg_path) {
         crash = redo_pass(fp, flag == 1 ? log_num : -1);
     }
     if (!crash) {
-        // crash = undo_pass(fp, flag == 2 ? log_num : -1);
+        crash = undo_pass(fp, flag == 2 ? log_num : -1);
     }
     fclose(fp);
 
@@ -51,7 +51,7 @@ void anls_pass(FILE* fp) {
     }
     free(anls_log);
     for (const auto& loser : losers) {
-        trx_resurrect_entry(loser);
+        // trx_resurrect_entry(loser);
     }
     fprintf(fp, "[ANALYSIS] Analysis pass end");
     fprintf(fp, ". Winner:");
