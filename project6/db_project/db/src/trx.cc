@@ -87,7 +87,7 @@ int trx_abort(int trx_id) {
         return 0;
     }
 
-    raise(2);
+    // raise(2);
 
     trx_rollback(trx_id);
     log_write_log(trx_get_last_LSN(trx_id), trx_id, ROLLBACK);
