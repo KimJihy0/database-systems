@@ -91,7 +91,7 @@ int redo_pass(FILE* fp, int log_num) {
                     buffer_unpin_page(redo_log->table_id, redo_log->page_num);
                     fprintf(fp, "LSN %lu [CONSIDER-REDO] Transaction id %d\n", redo_log->LSN, redo_log->trx_id);
                 }
-                if (trx_is_active(redo_log->trx_id)) {
+                if (trx_is_active2(redo_log->trx_id)) {
                     trx_set_last_LSN(redo_log->trx_id, redo_log->LSN);
                 }
                 break;
@@ -113,7 +113,7 @@ int redo_pass(FILE* fp, int log_num) {
                     buffer_unpin_page(redo_log->table_id, redo_log->page_num);
                     fprintf(fp, "LSN %lu [CONSIDER-REDO] Transaction id %d\n", redo_log->LSN, redo_log->trx_id);
                 }
-                if (trx_is_active(redo_log->trx_id)) {
+                if (trx_is_active2(redo_log->trx_id)) {
                     trx_set_last_LSN(redo_log->trx_id, redo_log->LSN);
                 }
                 break;

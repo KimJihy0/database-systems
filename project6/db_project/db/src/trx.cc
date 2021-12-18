@@ -147,6 +147,10 @@ int trx_is_active(int trx_id) {
     return ret_val;
 }
 
+int trx_is_active2(int trx_id) {
+    return trx_table[trx_id] != NULL;
+}
+
 uint64_t trx_get_last_LSN(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     uint64_t last_LSN = trx_table[trx_id]->last_LSN;
@@ -251,7 +255,6 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
             if (detect_deadlock(trx_id) != 0) {
                 buffer_unpin_page(table_id, page_num);
                 pthread_mutex_unlock(&lock_latch);
-                trx_abort(trx_id);
                 return -1;
             }
             buffer_unpin_page(table_id, page_num);
