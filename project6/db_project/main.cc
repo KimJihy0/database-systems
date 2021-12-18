@@ -79,7 +79,7 @@ int main() {
     pthread_t search_threads[SEARCH_THREADS_NUMBER];
 
     int64_t table_id;
-
+// 
     srand(time(__null));
 
     char pathname[256];
