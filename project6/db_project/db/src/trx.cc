@@ -191,57 +191,57 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
         lock_obj = lock_obj->next_lock;
     }
 
-    // // implicit locking
-    // lock_obj = lock_entry->head;
-    // while (lock_obj != NULL) {
-    //     if (GET_BIT(lock_obj->bitmap, idx) != 0)
-    //         break;
-    //     lock_obj = lock_obj->next_lock;
-    // }
-    // if (lock_obj == NULL) {
-    //     pthread_mutex_lock(&trx_latch);
-    //     int impl_trx_id = (*p)->slots[idx].trx_id;
-    //     if (trx_is_active(impl_trx_id)) {
-    //         if (impl_trx_id == trx_id) {
-    //             pthread_mutex_unlock(&trx_latch);
-    //             pthread_mutex_unlock(&lock_latch);
-    //             return 0;
-    //         }
-    //         lock_alloc(table_id, page_num, idx, impl_trx_id, EXCLUSIVE);
-    //     } else if (lock_mode == EXCLUSIVE) {
-    //         (*p)->slots[idx].trx_id = trx_id;
-    //         pthread_mutex_unlock(&trx_latch);
-    //         pthread_mutex_unlock(&lock_latch);
-    //         return 0;
-    //     }
-    //     pthread_mutex_unlock(&trx_latch);
-    // }
+    // implicit locking
+    lock_obj = lock_entry->head;
+    while (lock_obj != NULL) {
+        if (GET_BIT(lock_obj->bitmap, idx) != 0)
+            break;
+        lock_obj = lock_obj->next_lock;
+    }
+    if (lock_obj == NULL) {
+        pthread_mutex_lock(&trx_latch);
+        int impl_trx_id = (*p)->slots[idx].trx_id;
+        if (trx_is_active(impl_trx_id)) {
+            if (impl_trx_id == trx_id) {
+                pthread_mutex_unlock(&trx_latch);
+                pthread_mutex_unlock(&lock_latch);
+                return 0;
+            }
+            lock_alloc(table_id, page_num, idx, impl_trx_id, EXCLUSIVE);
+        } else if (lock_mode == EXCLUSIVE) {
+            (*p)->slots[idx].trx_id = trx_id;
+            pthread_mutex_unlock(&trx_latch);
+            pthread_mutex_unlock(&lock_latch);
+            return 0;
+        }
+        pthread_mutex_unlock(&trx_latch);
+    }
 
-    // // lock compression
-    // if (lock_mode == SHARED) {
-    //     lock_obj = lock_entry->head;
-    //     while (lock_obj != NULL) {
-    //         if (lock_obj->lock_mode == SHARED && lock_obj->owner_trx_id == trx_id)
-    //             break;
-    //         lock_obj = lock_obj->next_lock;
-    //     }
-    //     if (lock_obj != NULL) {
-    //         lock_t* cur_obj = lock_entry->head;
-    //         while (cur_obj != NULL) {
-    //             if (GET_BIT(cur_obj->bitmap, idx) != 0 &&
-    //                 cur_obj->owner_trx_id != trx_id &&
-    //                 cur_obj->lock_mode == EXCLUSIVE) {
-    //                 break;
-    //             }
-    //             cur_obj = cur_obj->next_lock;
-    //         }
-    //         if (cur_obj == NULL) {
-    //             SET_BIT(lock_obj->bitmap, idx);
-    //             pthread_mutex_unlock(&lock_latch);
-    //             return 0;
-    //         }
-    //     }
-    // }
+    // lock compression
+    if (lock_mode == SHARED) {
+        lock_obj = lock_entry->head;
+        while (lock_obj != NULL) {
+            if (lock_obj->lock_mode == SHARED && lock_obj->owner_trx_id == trx_id)
+                break;
+            lock_obj = lock_obj->next_lock;
+        }
+        if (lock_obj != NULL) {
+            lock_t* cur_obj = lock_entry->head;
+            while (cur_obj != NULL) {
+                if (GET_BIT(cur_obj->bitmap, idx) != 0 &&
+                    cur_obj->owner_trx_id != trx_id &&
+                    cur_obj->lock_mode == EXCLUSIVE) {
+                    break;
+                }
+                cur_obj = cur_obj->next_lock;
+            }
+            if (cur_obj == NULL) {
+                SET_BIT(lock_obj->bitmap, idx);
+                pthread_mutex_unlock(&lock_latch);
+                return 0;
+            }
+        }
+    }
 
     // lock allocation
     lock_obj = lock_alloc(table_id, page_num, idx, trx_id, lock_mode);
