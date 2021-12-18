@@ -131,31 +131,72 @@ int undo_pass(FILE* fp, int log_num) {
     // log_t* undo_log = (log_t*)alloca(300);
     // log_t* undo_log = (log_t*)malloc(sizeof(log_t) + 2 * 108 + 8);
     int count = log_num;
-    for  (const auto& loser : losers) {
-        uint64_t undo_LSN = trx_get_last_LSN(loser);
-        while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
-            if (count-- == 0) {
-                free(undo_log);
-                return 1;
+
+    int undo_LSN, undo_trx_id;
+    std::set<int> to_undo;
+    for (const auto& loser : losers) {
+        to_undo.insert(trx_get_last_LSN(loser));
+    }
+    while (!to_undo.empty()) {
+        undo_LSN = *std::max_element(to_undo.begin(), to_undo.end());
+        to_undo.erase(undo_LSN);
+        for (const auto& loser : losers) {
+            if (trx_get_last_LSN(loser) == undo_LSN) {
+                undo_trx_id = loser;
+                break;
             }
-            uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
+        }
+        log_read_log(undo_LSN, undo_log);
+        if (undo_log->type == UPDATE || undo_log->type == COMPENSATE) {
+            uint64_t ret_LSN = log_write_log(trx_get_last_LSN(undo_trx_id), undo_trx_id, COMPENSATE,
                     undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
                     undo_log->trailer + undo_log->size, undo_log->trailer, undo_log->prev_LSN);
-            trx_set_last_LSN(loser, ret_LSN);
-
+            trx_set_last_LSN(undo_trx_id, ret_LSN);
+            
             buffer_read_page(undo_log->table_id, undo_log->page_num, &undo_page);
             memcpy((char*)undo_page + undo_log->offset, undo_log->trailer, undo_log->size);
             undo_page->page_LSN = ret_LSN;
             buffer_write_page(undo_log->table_id, undo_log->page_num);
 
             fprintf(fp, "LSN %lu [UPDATE] Transaction id %d undo apply\n", undo_log->LSN, undo_log->trx_id);
-            undo_LSN = undo_log->type == UPDATE ?
-                       undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size);
+            to_undo.insert(undo_log->type == UPDATE ?
+                           undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size));
         }
-        log_write_log(trx_get_last_LSN(loser), loser, ROLLBACK);
-        trx_remove_entry(loser);
+        else {
+            log_write_log(trx_get_last_LSN(undo_trx_id), undo_trx_id, ROLLBACK);
+            trx_remove_entry(undo_trx_id);
+        }
     }
     free(undo_log);
     fprintf(fp, "[UNDO] Undo pass end.\n");
-    return 0;
+
+            
+
+    // for  (const auto& loser : losers) {
+    //     uint64_t undo_LSN = trx_get_last_LSN(loser);
+    //     while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
+    //         if (count-- == 0) {
+    //             free(undo_log);
+    //             return 1;
+    //         }
+    //         uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
+    //                 undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
+    //                 undo_log->trailer + undo_log->size, undo_log->trailer, undo_log->prev_LSN);
+    //         trx_set_last_LSN(loser, ret_LSN);
+
+    //         buffer_read_page(undo_log->table_id, undo_log->page_num, &undo_page);
+    //         memcpy((char*)undo_page + undo_log->offset, undo_log->trailer, undo_log->size);
+    //         undo_page->page_LSN = ret_LSN;
+    //         buffer_write_page(undo_log->table_id, undo_log->page_num);
+
+    //         fprintf(fp, "LSN %lu [UPDATE] Transaction id %d undo apply\n", undo_log->LSN, undo_log->trx_id);
+    //         undo_LSN = undo_log->type == UPDATE ?
+    //                    undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size);
+    //     }
+    //     log_write_log(trx_get_last_LSN(loser), loser, ROLLBACK);
+    //     trx_remove_entry(loser);
+    // }
+    // free(undo_log);
+    // fprintf(fp, "[UNDO] Undo pass end.\n");
+    // return 0;
 }
