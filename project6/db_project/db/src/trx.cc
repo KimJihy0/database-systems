@@ -154,16 +154,16 @@ int trx_is_active2(int trx_id) {
 }
 
 uint64_t trx_get_last_LSN(int trx_id) {
-    pthread_mutex_lock(&trx_latch);
+    // pthread_mutex_lock(&trx_latch);
     uint64_t last_LSN = trx_table[trx_id]->last_LSN;
-    pthread_mutex_unlock(&trx_latch);
+    // pthread_mutex_unlock(&trx_latch);
     return last_LSN;
 }
 
 void trx_set_last_LSN(int trx_id, uint64_t last_LSN) {
-    pthread_mutex_lock(&trx_latch);
+    // pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->last_LSN = last_LSN;
-    pthread_mutex_unlock(&trx_latch);
+    // pthread_mutex_unlock(&trx_latch);
 }
 
 void trx_resurrect_entry(int trx_id) {
@@ -201,7 +201,7 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
     // if (lock_obj == NULL) {
     //     pthread_mutex_lock(&trx_latch);
     //     int impl_trx_id = (*p)->slots[idx].trx_id;
-    //     if (trx_is_active(impl_trx_id)) {
+    //     if (trx_is_active2(impl_trx_id)) {
     //         if (impl_trx_id == trx_id) {
     //             pthread_mutex_unlock(&trx_latch);
     //             pthread_mutex_unlock(&lock_latch);
@@ -306,12 +306,12 @@ lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, in
 
 int detect_deadlock(int trx_id) {
     std::unordered_map<int, int> visit;
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     do {
         visit[trx_id] = 1;
         trx_id = trx_table[trx_id]->waits_for_trx_id;
     } while ((trx_table[trx_id] != NULL) && !visit[trx_id]);
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
     return trx_id;
 }
 

@@ -7,14 +7,14 @@
 #include <time.h>
 
 #define NUM_KEYS    (10000)
-#define NUM_BUFS    (8)
+#define NUM_BUFS    (100)
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
 #define UPDATE_THREADS_NUMBER   (100)
 #define SEARCH_THREADS_NUMBER   (0)
 
-#define UPDATE_COUNT            (50)
+#define UPDATE_COUNT            (1000000)
 #define SEARCH_COUNT            (50)
 
 std::string gen_rand_val(int size);

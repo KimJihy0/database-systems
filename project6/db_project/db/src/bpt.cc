@@ -180,10 +180,12 @@ void insert_into_leaf(int64_t table_id, pagenum_t leaf_pgnum,
     for (int i = leaf->num_keys; i > insertion_index; i--) {
         leaf->slots[i].key = leaf->slots[i - 1].key;
         leaf->slots[i].size = leaf->slots[i - 1].size;
+        leaf->slots[i].trx_id = leaf->slots[i - 1].trx_id;
         leaf->slots[i].offset = leaf->slots[i - 1].offset;
     }
     leaf->slots[insertion_index].key = key;
     leaf->slots[insertion_index].size = val_size;
+    leaf->slots[insertion_index].trx_id = 0;
     leaf->slots[insertion_index].offset = offset - val_size;
     memcpy((char*)leaf + offset - val_size, value, val_size);
 
@@ -212,10 +214,12 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         if (j == insertion_index) j++;
         temp_slots[j].key = leaf->slots[i].key;
         temp_slots[j].size = leaf->slots[i].size;
+        temp_slots[j].trx_id = leaf->slots[i].trx_id;
         temp_slots[j].offset = leaf->slots[i].offset;
     }
     temp_slots[insertion_index].key = key;
     temp_slots[insertion_index].size = val_size;
+    temp_slots[insertion_index].trx_id = 0;
     temp_slots[insertion_index].offset = offset - val_size;
     memcpy(temp_page + offset, (char*)leaf + offset, PAGE_SIZE - offset);
     memcpy(temp_page + offset - val_size, value, val_size);
@@ -239,6 +243,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         offset -= temp_slots[i].size;
         leaf->slots[i].key = temp_slots[i].key;
         leaf->slots[i].size = temp_slots[i].size;
+        leaf->slots[i].trx_id = temp_slots[i].trx_id;
         leaf->slots[i].offset = offset;
         memcpy((char*)leaf + offset, temp_page + temp_slots[i].offset, temp_slots[i].size);
         leaf->num_keys++;
@@ -250,6 +255,7 @@ void insert_into_leaf_split(int64_t table_id, pagenum_t leaf_pgnum,
         offset -= temp_slots[i].size;
         new_leaf->slots[j].key = temp_slots[i].key;
         new_leaf->slots[j].size = temp_slots[i].size;
+        new_leaf->slots[j].trx_id = temp_slots[i].trx_id;
         new_leaf->slots[j].offset = offset;
         memcpy((char*)new_leaf + offset, temp_page + temp_slots[i].offset, temp_slots[i].size);
         new_leaf->num_keys++;
@@ -382,6 +388,7 @@ void start_tree(int64_t table_id, int64_t key, char* value, uint16_t val_size) {
     uint16_t offset = PAGE_SIZE - val_size;
     root->slots[0].key = key;
     root->slots[0].size = val_size;
+    root->slots[0].trx_id = 0;
     root->slots[0].offset = offset;
     memcpy((char*)root + offset, value, val_size);
     root->free_space -= (SLOT_SIZE + val_size);
