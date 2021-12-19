@@ -185,17 +185,19 @@ int undo_pass(FILE* fp, int log_num) {
                 free(undo_log);
                 return 1;
             }
-            uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
-                    undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
-                    undo_log->trailer + undo_log->size, undo_log->trailer, undo_log->prev_LSN);
-            trx_set_last_LSN(loser, ret_LSN);
+            if (undo_log->type == UPDATE) {
+                uint64_t ret_LSN = log_write_log(trx_get_last_LSN(loser), loser, COMPENSATE,
+                        undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
+                        undo_log->trailer + undo_log->size, undo_log->trailer, undo_log->prev_LSN);
+                trx_set_last_LSN(loser, ret_LSN);
 
-            buffer_read_page(undo_log->table_id, undo_log->page_num, &undo_page);
-            memcpy((char*)undo_page + undo_log->offset, undo_log->trailer, undo_log->size);
-            undo_page->page_LSN = ret_LSN;
-            buffer_write_page(undo_log->table_id, undo_log->page_num);
+                buffer_read_page(undo_log->table_id, undo_log->page_num, &undo_page);
+                memcpy((char*)undo_page + undo_log->offset, undo_log->trailer, undo_log->size);
+                undo_page->page_LSN = ret_LSN;
+                buffer_write_page(undo_log->table_id, undo_log->page_num);
 
-            fprintf(fp, "LSN %lu [UPDATE] Transaction id %d undo apply\n", undo_log->LSN, undo_log->trx_id);
+                fprintf(fp, "LSN %lu [UPDATE] Transaction id %d undo apply\n", undo_log->LSN, undo_log->trx_id);
+            }
             undo_LSN = undo_log->type == UPDATE ?
                        undo_log->prev_LSN : *(undo_log->trailer + 2 * undo_log->size);
         }

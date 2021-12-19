@@ -156,16 +156,16 @@ int trx_is_active2(int trx_id) {
 }
 
 uint64_t trx_get_last_LSN(int trx_id) {
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     uint64_t last_LSN = trx_table[trx_id]->last_LSN;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
     return last_LSN;
 }
 
 void trx_set_last_LSN(int trx_id, uint64_t last_LSN) {
-    // pthread_mutex_lock(&trx_latch);
+    pthread_mutex_lock(&trx_latch);
     trx_table[trx_id]->last_LSN = last_LSN;
-    // pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_unlock(&trx_latch);
 }
 
 void trx_resurrect_entry(int trx_id) {
