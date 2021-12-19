@@ -83,7 +83,7 @@ int trx_abort(int trx_id) {
     printf("----------------------------------------------------------------------------------------trx_abort(%d)\n", trx_id);
     #endif
     if (!trx_is_active(trx_id)) {
-        return trx_id;
+        return 0;
     }
 
     trx_rollback(trx_id);

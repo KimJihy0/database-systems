@@ -31,7 +31,7 @@ int init_log(char* log_path) {
     fprintf(logfile_fp, "log_size, LSN, prev_LSN, trx_id, type, table_id, page_num, offset, size, old_image, new_image, next_undo_LSN\n");
     #endif
 
-    logbuffer_size = 4096;
+    logbuffer_size = 100000;
     logbuffer = new char[logbuffer_size];
     log_fd = open(log_path, O_RDWR | O_CREAT | O_APPEND, 0644);
     if (log_fd < 0)
@@ -169,7 +169,7 @@ void log_force() {
     pthread_mutex_lock(&logbuffer_latch);
     if (write(log_fd, logbuffer, log_tail) != log_tail)
         ERR_SYS("Failure to force log(write error)");
-    fsync(log_fd);
+    // fsync(log_fd);
     flushed_LSN = LSN;
     log_tail =  0;
     pthread_mutex_unlock(&logbuffer_latch);
