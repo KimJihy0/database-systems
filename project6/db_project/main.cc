@@ -11,7 +11,7 @@
 #define SIZE(n)     ((n) % 63 + 46)
 #define NEW_VAL     ((char*)"$$")
 
-#define UPDATE_THREADS_NUMBER   (100)
+#define UPDATE_THREADS_NUMBER   (50)
 #define SEARCH_THREADS_NUMBER   (0)
 
 #define UPDATE_COUNT            (1000000)
@@ -112,6 +112,8 @@ int main() {
 
     print_pgnum(table_id, 2559);
     print_pgnum(table_id, 2558);
+
+    return 0;
 
     shutdown_db();
     printf("file saved complete(%ld).\n", table_id);

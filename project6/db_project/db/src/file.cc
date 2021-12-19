@@ -130,7 +130,7 @@ void file_write_page(int64_t table_id, pagenum_t page_num, const page_t* src) {
     lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
     if (write(fd, src, PAGE_SIZE) != PAGE_SIZE)
         ERR_SYS("Failure to write page(write error)");
-    fsync(fd);
+    // fsync(fd);
 }
 
 void file_close_table_file() {
