@@ -18,7 +18,7 @@ void recovery(int flag, int log_num, char* logmsg_path) {
         crash = redo_pass(fp, flag == 1 ? log_num : -1);
     }
     if (!crash) {
-        // crash = undo_pass(fp, flag == 2 ? log_num : -1);
+        crash = undo_pass(fp, flag == 2 ? log_num : -1);
     }
     fclose(fp);
 
@@ -134,7 +134,7 @@ int undo_pass(FILE* fp, int log_num) {
 
     uint64_t undo_LSN;
 
-    
+
     int undo_trx_id;
     std::set<int> to_undo;
     for (const auto& loser : losers) {
