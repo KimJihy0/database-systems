@@ -169,6 +169,7 @@ void log_force() {
     pthread_mutex_lock(&logbuffer_latch);
     if (write(log_fd, logbuffer, log_tail) != log_tail)
         ERR_SYS("Failure to force log(write error)");
+    fsync(log_fd);
     flushed_LSN = LSN;
     log_tail =  0;
     pthread_mutex_unlock(&logbuffer_latch);
