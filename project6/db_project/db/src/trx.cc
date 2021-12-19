@@ -118,6 +118,7 @@ void trx_rollback(int trx_id) {
     pthread_mutex_lock(&trx_latch);
     uint64_t undo_LSN = trx_table[trx_id]->last_LSN;
     pthread_mutex_unlock(&trx_latch);
+    pthread_mutex_lock(&lock_latch);
     while (log_read_log(undo_LSN, undo_log) && undo_log->type != BEGIN) {
         uint64_t ret_LSN = log_write_log(trx_get_last_LSN(trx_id), trx_id, COMPENSATE,
                 undo_log->table_id, undo_log->page_num, undo_log->offset, undo_log->size,
@@ -131,6 +132,7 @@ void trx_rollback(int trx_id) {
 
         undo_LSN = undo_log->prev_LSN;
     }
+    pthread_mutex_unlock(&lock_latch);
     free(undo_log);
 }
 
