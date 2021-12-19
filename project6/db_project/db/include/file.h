@@ -3,16 +3,13 @@
 
 #include <stdint.h>
 
-#include <signal.h>
-
 #define PAGE_SIZE           (4 * 1024)
 #define INITIAL_FILESIZE    (10 * 1024 * 1024)
 #define INITIAL_PAGENUM     (INITIAL_FILESIZE / PAGE_SIZE)
 #define NUM_BUCKETS         31
 
 #ifndef ERR_SYS
-// #define ERR_SYS(s) ({ perror((s)); exit(1); })
-#define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
+#define ERR_SYS(s) ({ perror((s)); exit(1); })
 #endif
 
 typedef uint64_t pagenum_t;

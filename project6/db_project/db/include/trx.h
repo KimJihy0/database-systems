@@ -6,8 +6,6 @@
 #include "buffer.h"
 #include "log.h"
 
-#define verbose 0
-
 #define SHARED      0
 #define EXCLUSIVE   1
 
@@ -64,8 +62,5 @@ int lock_acquire(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int 
 lock_t* lock_alloc(int64_t table_id, pagenum_t page_num, int idx, int trx_id, int lock_mode);
 int detect_deadlock(int trx_id);
 int lock_release(lock_t* lock_obj);
-
-void print_waits_for_graph(int num = 8);
-void* print_locks(void* args);
 
 #endif

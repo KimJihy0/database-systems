@@ -31,7 +31,7 @@ int64_t file_open_table_file(const char* pathname) {
         lseek(fd, 0, SEEK_SET);
         if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE)
             ERR_SYS("Failure to open table file(write error)");
-        // // fsync(fd);
+        fsync(fd);
 
         page_t p;
         for (int i = 1; i < INITIAL_PAGENUM; i++) {
@@ -39,7 +39,7 @@ int64_t file_open_table_file(const char* pathname) {
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to open table file(write error)");
         }
-        // // fsync(fd);
+        fsync(fd);
     }
 
     int64_t table_id = atol(pathname + 4);
@@ -65,7 +65,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
         lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
         if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
             ERR_SYS("Failure to alloc page(write error)");
-        // // fsync(fd);
+        fsync(fd);
 
         pagenum_t i;
         for (i = page_num + 1; i < 2 * page_num; i++) {
@@ -73,7 +73,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
             if (write(fd, &p, PAGE_SIZE) != PAGE_SIZE)
                 ERR_SYS("Failure to alloc page(write error)");
         }
-        // fsync(fd);
+        fsync(fd);
 
         header.next_frpg = i - 1;
         header.num_pages = i;
@@ -89,7 +89,7 @@ pagenum_t file_alloc_page(int64_t table_id) {
     lseek(fd, 0, SEEK_SET);
     if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE)
         ERR_SYS("Failure to alloc page(write error)");
-    // fsync(fd);
+    fsync(fd);
 
     return page_num;
 }
@@ -107,13 +107,13 @@ void file_free_page(int64_t table_id, pagenum_t page_num) {
     lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
     if (write(fd, &free, PAGE_SIZE) != PAGE_SIZE)
         ERR_SYS("Failure to free page(write error)");
-    // fsync(fd);
+    fsync(fd);
 
     header.next_frpg = page_num;
     lseek(fd, 0, SEEK_SET);
     if (write(fd, &header, PAGE_SIZE) != PAGE_SIZE)
         ERR_SYS("Failure to free page(write error)");
-    // fsync(fd);
+    fsync(fd);
 }
 
 void file_read_page(int64_t table_id, pagenum_t page_num, page_t* dest) {
@@ -130,7 +130,7 @@ void file_write_page(int64_t table_id, pagenum_t page_num, const page_t* src) {
     lseek(fd, page_num * PAGE_SIZE, SEEK_SET);
     if (write(fd, src, PAGE_SIZE) != PAGE_SIZE)
         ERR_SYS("Failure to write page(write error)");
-    // fsync(fd);
+    fsync(fd);
 }
 
 void file_close_table_file() {

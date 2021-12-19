@@ -14,8 +14,7 @@
 #define next_undo_LSN(log)    ((log)->trailer + 2 * (log)->size)
 
 #ifndef ERR_SYS
-// #define ERR_SYS(s) ({ perror((s)); exit(1); })
-#define ERR_SYS(s) ({ perror((s)); for (int i = 0; ; i++); })
+#define ERR_SYS(s) ({ perror((s)); exit(1); })
 #endif
 
 typedef uint64_t pagenum_t;
@@ -45,7 +44,6 @@ struct log_t {
 
 int init_log(char* log_path);
 int shutdown_log();
-void trunc_log();
 
 uint64_t log_read_log(uint64_t dest_LSN, log_t* dest);
 uint64_t log_write_log(uint64_t prev_LSN, int trx_id, int type);

@@ -1,7 +1,6 @@
 #include "bpt.h"
 
 #include <string.h>
-#include <signal.h>
 
 int init_db(int num_buf, int flag, int log_num, char* log_path, char* logmsg_path) {
     if (init_log(log_path) != 0) return -1;
